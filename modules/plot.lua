@@ -12,7 +12,7 @@ local colors = {
 
 
 
-function draw_box(parent, x1, y1, x2, y2, color)
+function draw_box(parent, x1, y1, x2, y2, color, depth_offset)
 	b = Bitmap(parent)
 	b:SetSolidColor(color)
 	
@@ -32,7 +32,13 @@ function draw_box(parent, x1, y1, x2, y2, color)
 		b.Bottom:Set(y1)
 	end
 	
-	b.Depth:Set(function() return parent.Depth() + 1 end)
+	if not depth_offset then
+		depth_offset = 1
+	end
+
+	b.Depth:Set(function() return parent.Depth() + depth_offset end)
+
+	return b
 end
 
 
@@ -60,11 +66,12 @@ function draw_line(parent, x1, base_y, y1, x2, y2)
 end
 
 
+-- pos_x/y are screen coordinates of zero, i.e. the lower left corner
 -- assumes 'data_x' is sorted!
 -- fits data vertically into parent
-function draw_plot(parent, data_x, data_y, limit_y)
+function draw_plot(parent, pos_x, pos_y, height, data_x, data_y, limit_y)
 
-
+-- appearantly, all widgets need valid position & size, even if they are dummy-objects
 plot_widget = Group(parent)
 plot_widget.Left:Set(0)
 plot_widget.Top:Set(0)
@@ -103,7 +110,7 @@ local last_y = nil
 for i = 1,table.getn(data_x) do
 
 	local x = data_x[i]
-	local y = data_y[i] / limit_y * parent.Height()
+	local y = data_y[i] / limit_y * height
 
 	--LOG("datapoint: "..tostring(x)..":"..tostring(y))
 
@@ -119,13 +126,13 @@ for i = 1,table.getn(data_x) do
 		end
 
 		if y > 0 then
-			draw_line(plot_widget, last_x+parent.Left(), parent.Bottom(), last_y, x+parent.Left(), y)
+			draw_line(plot_widget, last_x+pos_x, pos_y, last_y, x+pos_x, y)
 		else
 			local color = colors.stall
 			if data_y[i] < -1 then
 				color = colors.overflow
 			end
-			draw_box(plot_widget, last_x+parent.Left(), parent.Bottom(), x+parent.Left(), parent.Top(), color)
+			draw_box(plot_widget, last_x+pos_x, pos_y, x+pos_y, pos_y-height, color)
 		end
 	end
 

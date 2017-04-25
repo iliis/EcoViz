@@ -49,7 +49,7 @@ local W = 500
 local H = 100
 
 
-
+local history_perc = 0.2 -- how much of the graph plots past data
 
 local data_x = {}
 local data_y = {}
@@ -92,6 +92,15 @@ function CreateModUI(parent)
 	
 	--plot_widget = plot.draw_plot(resource_plot_widget, {0, 100, 180, 190, 200, 300, 400, 450, 500}, {50, 30, 30, 0, 100, 120, 0, 0, 20})
 	
+	-- draw a vertical line to indicate the present
+	plot.draw_box(resource_plot_widget,
+		resource_plot_widget.Left()+W*history_perc-1,
+		resource_plot_widget.Top(),
+		resource_plot_widget.Left()+W*history_perc+1,
+		resource_plot_widget.Bottom(),
+		'ff0000ff', -- some nice shade of blue ;)
+		10 -- draw it above plot itself
+	)
 	
 	return resource_plot_widget
 end
@@ -129,7 +138,7 @@ function update()
 	local econData = GetEconomyTotals()
     local simFrequency = GetSimTicksPerSecond()
 
-	if current_time < W then
+	if current_time < W*history_perc then
 		current_time = current_time + 1
 		table.insert(data_x, current_time)
 	else
@@ -144,9 +153,10 @@ function update()
         local lastRequestedVal	= econData["lastUseRequested"][tableID]
         local lastActualVal		= econData["lastUseActual"][tableID]
 
+		-- copied from lua/ui/game/economy.lua, not exactly sure why this is required ;)
 		local requestedAvg	= math.min(lastRequestedVal * simFrequency, 999999)
-		local actualAvg		= math.min(lastActualVal * simFrequency, 999999)
-		local incomeAvg		= math.min(incomeVal * simFrequency, 999999)
+		local actualAvg		= math.min(lastActualVal	* simFrequency, 999999)
+		local incomeAvg		= math.min(incomeVal		* simFrequency, 999999)
 
 		local rateVal = 0
         if storedVal > 0.5 then
@@ -170,6 +180,7 @@ function update()
 				table.insert(data_y, storedVal)
 			end
 		end
+		-- end copy
 	end
 
 	DisplayEconData("MASS")
@@ -182,7 +193,12 @@ function update()
 	end
 
 	
-	plot_widget = plot.draw_plot(resource_plot_widget, data_x, data_y, econData.maxStorage.MASS)
+	plot_widget = plot.draw_plot(resource_plot_widget,
+		resource_plot_widget.Left() + W*history_perc - current_time,
+		resource_plot_widget.Bottom(),
+		resource_plot_widget.Height(),
+		data_x, data_y, econData.maxStorage.MASS)
+	
 
 	--LOG_OBJ(econData)
 end
