@@ -31,12 +31,12 @@ local H = 100
 
 
 
-function CreateModUI()
+function CreateModUI(parent)
 
 	LOG("creating resource plot UI")
 
 	--local parent = import('/lua/ui/game/borders.lua').GetMapGroup()
-	local parent = GetFrame(0)
+	--local parent = GetFrame(0)
 	
 	--local border_bg = UIUtil.SkinnableFile('/game/avatar-factory-panel/avatar-s-e-f_bmp.dds')
 	
@@ -44,7 +44,7 @@ function CreateModUI()
 	widget:SetSolidColor('40000000') -- format: ARGB
 	
 	widget.Left:Set(400)
-	widget.Top:Set(310)
+	widget.Top:Set(110)
 	widget.Height:Set(H)
     widget.Width:Set(W)
 	

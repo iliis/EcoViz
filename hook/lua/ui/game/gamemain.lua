@@ -1,19 +1,40 @@
 local Button = import('/lua/maui/button.lua').Button
 local LayoutHelpers = import('/lua/maui/layouthelpers.lua') 
-
+local Control = import('/lua/maui/control.lua').Control
+local Bitmap = import('/lua/maui/bitmap.lua').Bitmap
 
 local originalCreateUI = CreateUI 
 
 local widget = nil
+
+
+function load_mod()
+
+  if widget then
+	widget:Destroy()
+  end
+
+  widget = Bitmap(GetFrame(0))
+  widget.Left:Set(0)
+  widget.Top:Set(0)
+  widget.Width:Set(0)
+  widget.Height:Set(0)
+  
+  import('/mods/EcoPredict/modules/resource_plot.lua').CreateModUI(widget)
+
+end
+
+
 function CreateUI(isReplay) 
   originalCreateUI(isReplay) 
  
   #AddBeatFunction(UpdateAllUnits)
   
-  widget = import('/mods/EcoPredict/modules/resource_plot.lua').CreateModUI()
+
+  
   #KeyMapper.SetUserKeyAction('reload_ecopredict_ui', {action =  'import(\'/mods/EcoPredict/modules/resource_plot.lua\').CreateModUI()', category = 'user', order = 4})
   
-  
+  load_mod()
   
 	reload_button = Button(GetFrame(0),
 		'/textures/ui/common/dialogs/standard_btn/standard_btn_up.dds',
@@ -28,8 +49,7 @@ function CreateUI(isReplay)
 
 	reload_button.OnClick = function (self, modifiers)
 		LOG("reloading resource predictor")
-		widget:Destroy()
-		widget = import('/mods/EcoPredict/modules/resource_plot.lua').CreateModUI()
+		load_mod()
 	end
 	reload_button:EnableHitTest(true)
 	
