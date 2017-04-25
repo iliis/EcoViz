@@ -1,6 +1,6 @@
 local Button = import('/lua/maui/button.lua').Button
 local LayoutHelpers = import('/lua/maui/layouthelpers.lua') 
-local Control = import('/lua/maui/control.lua').Control
+local Group = import('/lua/maui/group.lua').Group
 local Bitmap = import('/lua/maui/bitmap.lua').Bitmap
 
 local originalCreateUI = CreateUI 
@@ -14,27 +14,35 @@ function load_mod()
 	widget:Destroy()
   end
 
-  widget = Bitmap(GetFrame(0))
+  widget = Group(GetFrame(0))
   widget.Left:Set(0)
   widget.Top:Set(0)
   widget.Width:Set(0)
   widget.Height:Set(0)
   
-  import('/mods/EcoPredict/modules/resource_plot.lua').CreateModUI(widget)
+  local rplot = import('/mods/EcoPredict/modules/resource_plot.lua')
+  rplot.CreateModUI(widget)
+  
+end
 
+function beat_func()
+	local rplot = import('/mods/EcoPredict/modules/resource_plot.lua')
+	rplot.update()
 end
 
 
 function CreateUI(isReplay) 
   originalCreateUI(isReplay) 
  
-  #AddBeatFunction(UpdateAllUnits)
+  
   
 
   
   #KeyMapper.SetUserKeyAction('reload_ecopredict_ui', {action =  'import(\'/mods/EcoPredict/modules/resource_plot.lua\').CreateModUI()', category = 'user', order = 4})
   
   load_mod()
+
+  AddBeatFunction(beat_func)
   
 	reload_button = Button(GetFrame(0),
 		'/textures/ui/common/dialogs/standard_btn/standard_btn_up.dds',

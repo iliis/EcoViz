@@ -1,4 +1,15 @@
 local Bitmap = import('/lua/maui/bitmap.lua').Bitmap
+local Group = import('/lua/maui/group.lua').Group
+
+
+
+local colors = {
+	mass     = 'ffc6fb08',
+	energy   = 'ffffc300',
+	stall    = 'ffff3900',
+	overflow = 'ffe8fd9a'
+}
+
 
 
 function draw_box(parent, x1, y1, x2, y2, color)
@@ -6,19 +17,19 @@ function draw_box(parent, x1, y1, x2, y2, color)
 	b:SetSolidColor(color)
 	
 	if x1 < x2 then
-		b.Top:Set(x1)
-		b.Bottom:Set(x2)
+		b.Left:Set(x1)
+		b.Right:Set(x2)
 	else
-		b.Top:Set(x2)
-		b.Bottom:Set(x1)
+		b.Left:Set(x2)
+		b.Right:Set(x1)
 	end
 	
 	if y1 < y2 then
-		b.Left:Set(y1)
-		b.Right:Set(y2)
+		b.Top:Set(y1)
+		b.Bottom:Set(y2)
 	else
-		b.Left:Set(y2)
-		b.Right:Set(y1)
+		b.Top:Set(y2)
+		b.Bottom:Set(y1)
 	end
 	
 	b.Depth:Set(function() return parent.Depth() + 1 end)
@@ -50,7 +61,16 @@ end
 
 
 -- assumes 'data_x' is sorted!
-function draw_plot(parent, data_x, data_y)
+-- fits data vertically into parent
+function draw_plot(parent, data_x, data_y, limit_y)
+
+
+plot_widget = Group(parent)
+plot_widget.Left:Set(0)
+plot_widget.Top:Set(0)
+plot_widget.Height:Set(1)
+plot_widget.Width:Set(1)
+
 
 local max_x = nil
 for _, x in data_x do
@@ -59,11 +79,16 @@ for _, x in data_x do
 	end
 end
 
-local max_y = nil
-for _, y in data_y do	
-	if not max_y or y > max_y then
-		max_y = y
+
+
+if not limit_y then
+	local max_y = nil
+	for _, y in data_y do	
+		if not max_y or y > max_y then
+			max_y = y
+		end
 	end
+	limit_y = max_y
 end
 
 --[[
@@ -78,7 +103,7 @@ local last_y = nil
 for i = 1,table.getn(data_x) do
 
 	local x = data_x[i]
-	local y = data_y[i]
+	local y = data_y[i] / limit_y * parent.Height()
 
 	--LOG("datapoint: "..tostring(x)..":"..tostring(y))
 
@@ -87,12 +112,27 @@ for i = 1,table.getn(data_x) do
 	end
 
 	if last_x < x then
-		draw_line(parent, last_x+parent.Left(), parent.Bottom(), last_y, x+parent.Left(), y)
+
+		if last_y < 0 then
+			-- prevent glitches between overflowing ('-2') and normal
+			last_y = y
+		end
+
+		if y > 0 then
+			draw_line(plot_widget, last_x+parent.Left(), parent.Bottom(), last_y, x+parent.Left(), y)
+		else
+			local color = colors.stall
+			if data_y[i] < -1 then
+				color = colors.overflow
+			end
+			draw_box(plot_widget, last_x+parent.Left(), parent.Bottom(), x+parent.Left(), parent.Top(), color)
+		end
 	end
 
 	last_x = x
 	last_y = y
 end
 
+return plot_widget
 
 end
