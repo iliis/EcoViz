@@ -113,6 +113,7 @@ for i = 1,table.getn(data_x) do
 	local y = data_y[i] / limit_y * height
 
 	--LOG("datapoint: "..tostring(x)..":"..tostring(y))
+	--LOG("datapoint: "..tostring(data_x[i])..":"..tostring(data_y[i]))
 
 	if not last_y then
 		last_y = y
@@ -132,7 +133,7 @@ for i = 1,table.getn(data_x) do
 			if data_y[i] < -1 then
 				color = colors.overflow
 			end
-			draw_box(plot_widget, last_x+pos_x, pos_y, x+pos_y, pos_y-height, color)
+			draw_box(plot_widget, last_x+pos_x, pos_y, x+pos_x, pos_y-height, color)
 		end
 	end
 

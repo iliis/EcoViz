@@ -153,11 +153,13 @@ function update()
         local lastRequestedVal	= econData["lastUseRequested"][tableID]
         local lastActualVal		= econData["lastUseActual"][tableID]
 
-		-- copied from lua/ui/game/economy.lua, not exactly sure why this is required ;)
+		-- copied from lua/ui/game/economy.lua
+		-- convert from resource/tick to resource/second
 		local requestedAvg	= math.min(lastRequestedVal * simFrequency, 999999)
 		local actualAvg		= math.min(lastActualVal	* simFrequency, 999999)
 		local incomeAvg		= math.min(incomeVal		* simFrequency, 999999)
 
+		--  not exactly sure why this is required ;)
 		local rateVal = 0
         if storedVal > 0.5 then
             rateVal = math.ceil(incomeAvg - actualAvg)
@@ -181,9 +183,11 @@ function update()
 			end
 		end
 		-- end copy
+
+		return rateVal, storedVal, maxStorageVal
 	end
 
-	DisplayEconData("MASS")
+	rate_mass, stored_mass, max_mass_storage = DisplayEconData("MASS")
 
 	-- actually plot data
 
@@ -192,13 +196,38 @@ function update()
 		plot_widget = nil
 	end
 
-	
+
 	plot_widget = plot.draw_plot(resource_plot_widget,
 		resource_plot_widget.Left() + W*history_perc - current_time,
 		resource_plot_widget.Bottom(),
 		resource_plot_widget.Height(),
 		data_x, data_y, econData.maxStorage.MASS)
-	
+
+
+	-- now try to predict the future development
+
+	local data_predict_x = {}
+	local data_predict_y = {}
+	for t = 1, W*(1-history_perc) do
+		table.insert(data_predict_x, t)
+
+		mass = stored_mass + t/simFrequency*rate_mass -- convert back to mass/tick, TODO: do everything in seconds
+		if mass > max_mass_storage then
+			mass = -2 -- overflow
+		elseif mass < 0 then
+			mass = -1 -- stall
+		end
+
+		table.insert(data_predict_y, mass)
+	end
+
+	-- actually plot our predictions
+	plot.draw_plot(plot_widget,
+		resource_plot_widget.Left() + W*history_perc,
+		resource_plot_widget.Bottom(),
+		resource_plot_widget.Height(),
+		--data_x, data_y, econData.maxStorage.MASS)
+		data_predict_x, data_predict_y, econData.maxStorage.MASS)
 
 	--LOG_OBJ(econData)
 end
