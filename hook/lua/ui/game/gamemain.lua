@@ -26,46 +26,67 @@ function load_mod()
 end
 
 function beat_func()
-	local rplot = import('/mods/EcoPredict/modules/resource_plot.lua')
-	rplot.update()
+	if widget then
+		local rplot = import('/mods/EcoPredict/modules/resource_plot.lua')
+		rplot.update()
+	end
 end
 
 
-function CreateUI(isReplay) 
-  originalCreateUI(isReplay) 
- 
-  
-  
 
-  
-  #KeyMapper.SetUserKeyAction('reload_ecopredict_ui', {action =  'import(\'/mods/EcoPredict/modules/resource_plot.lua\').CreateModUI()', category = 'user', order = 4})
-  
-  load_mod()
-
-  AddBeatFunction(beat_func)
-  
-	reload_button = Button(GetFrame(0),
+function create_button(parent, x, y, text)
+	button = Button(parent,
 		'/textures/ui/common/dialogs/standard_btn/standard_btn_up.dds',
 		'/textures/ui/common/dialogs/standard_btn/standard_btn_down.dds',
 		'/textures/ui/common/dialogs/standard_btn/standard_btn_over.dds',
 		'/textures/ui/common/dialogs/standard_btn/standard_btn_dis.dds')
 
-	reload_button.Depth:Set(99)
+	button.Depth:Set(99)
 
-	reload_button.Left:Set(400)
-	reload_button.Top:Set(60)
+	button.Left:Set(x)
+	button.Top:Set(y)
+	--button.Width:Set(108)
+	--button.Height:Set(41)
 
-	reload_button.OnClick = function (self, modifiers)
+	button:EnableHitTest(true)
+	
+	
+	button.label = UIUtil.CreateText(button, text, 10, UIUtil.bodyFont)
+	button.label:SetColor('white')
+    button.label:SetDropShadow(true)
+	LayoutHelpers.AtCenterIn(button.label, button)
+
+	return button
+end
+
+
+
+function CreateUI(isReplay) 
+	originalCreateUI(isReplay) 
+ 
+  
+  
+
+  
+	#KeyMapper.SetUserKeyAction('reload_ecopredict_ui', {action =  'import(\'/mods/EcoPredict/modules/resource_plot.lua\').CreateModUI()', category = 'user', order = 4})
+  
+	load_mod()
+
+	AddBeatFunction(beat_func)
+  
+	create_button(GetFrame(0), 400, 60, 'reload mod').OnClick = function (self, modifiers)
 		LOG("reloading resource predictor")
 		load_mod()
 	end
-	reload_button:EnableHitTest(true)
+
 	
-	
-	reload_button.label = UIUtil.CreateText(reload_button, 'reload mod', 10, UIUtil.bodyFont)
-	reload_button.label:SetColor('white')
-    reload_button.label:SetDropShadow(true)
-	LayoutHelpers.AtCenterIn(reload_button.label, reload_button)
+	create_button(GetFrame(0), 510, 60, 'hide mod').OnClick = function (self, modifiers)
+		LOG("hiding resource predictor")
+		if widget then
+			widget:Destroy()
+			widget = nil
+		end
+	end
 
 end
 

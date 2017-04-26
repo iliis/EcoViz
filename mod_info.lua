@@ -1,5 +1,5 @@
 name = "Eco Predict"
-uid = "8ffe5730-2ad3-4f5b-81b8-56622508c7e9"
+uid = "8ffe5730-2ad3-4f5b-81b8-EcoPredictV1"
 version = 1
 copyright = "GPL v3"
 description = "Testing out a few things. Hopefully plot future (predicted) eco."
@@ -9,7 +9,7 @@ selectable = true
 enabled = true
 exclusive = false
 ui_only = true
-requires = {}
+requires = {"zcbf6277-24e3-437a-b968-Common-v1"}
 conflicts = {}
 before = {}
 after = {}

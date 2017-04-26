@@ -7,9 +7,15 @@ local UIUtil = import('/lua/ui/uiutil.lua')
 local plot = import('/mods/EcoPredict/modules/plot.lua')
 
 
+local Units = import('/mods/common/units.lua')
 
 
-function LOG_OBJ(obj, indentation)
+
+local eco_types    = {'MASS', 'ENERGY'}
+local eco_types_sc = {'mass', 'energy'}
+
+
+function LOG_OBJ(obj, show_methods, indentation)
 
 	if not indentation then
 		indentation = ""
@@ -18,11 +24,17 @@ function LOG_OBJ(obj, indentation)
 	if type(obj) == "table" then
 
 		--LOG(indentation.."properties of "..tostring(obj))
+
+		local o = obj
+		if show_methods then
+			o = getmetatable(obj)
+		end
 		
-		for k, v in obj do
+		
+		for k, v in o do
 			LOG(indentation.."\t"..tostring(k).." = "..tostring(v))
 			if type(v) == "table" then
-				LOG_OBJ(v, indentation.."\t")
+				LOG_OBJ(v, show_methods, indentation.."\t")
 			end
 		end
 	else
@@ -101,9 +113,93 @@ function CreateModUI(parent)
 		'ff0000ff', -- some nice shade of blue ;)
 		10 -- draw it above plot itself
 	)
+
+
+
+
+	local us = Units.Get()
+	for _, unit in us do
+		LOG("------------------------------------------------")
+		LOG(unit:GetBlueprint().Description)
+		LOG("------------------------")
+		LOG_OBJ(Units.Data(unit))
+		LOG("---- methods:")
+		LOG_OBJ(unit, true)
+		--LOG("---- eco data:")
+		--LOG_OBJ(unit:GetEconData())
+		
+		--LOG("---- blueprint:")
+		--LOG_OBJ(unit:GetBlueprint())
+	end
+
+	LOG("sim ticks / second: "..tostring(GetSimTicksPerSecond()))
+
 	
 	return resource_plot_widget
 end
+
+
+
+
+
+ --[[ unit:
+INFO: <LOC uel0001_desc>Armored Command Unit
+INFO: ------------------------
+INFO:         is_idle = false
+INFO:         econ = table: 29F4DD48
+INFO:                 massRequested = 8
+INFO:                 energyConsumed = 70
+INFO:                 energyProduced = 10
+INFO:                 massConsumed = 8
+INFO:                 massProduced = 1
+INFO:                 energyRequested = 70
+INFO:         assisters = 0
+INFO:         assisting = 1
+INFO:         build_rate = 20
+INFO:         bonus = 1
+INFO: ---- methods:
+INFO:         GetEntityId = cfunction: 27CB4D80
+INFO:         GetWorkProgress = cfunction: 27CB3640
+INFO:         GetCommandQueue = cfunction: 27CB35C0
+INFO:         GetFocus = cfunction: 27CB4300
+INFO:         GetHealth = cfunction: 27CB4180
+INFO:         SetCustomName = cfunction: 27CB4000
+INFO:         GetMissileInfo = cfunction: 27CB3580
+INFO:         CanAttackTarget = cfunction: 27CB4E40
+INFO:         GetStat = cfunction: 27CB3380
+INFO:         HasSelectionSet = cfunction: 27CB4100
+INFO:         GetBuildRate = cfunction: 27CB4200
+INFO:         GetFootPrintSize = cfunction: 27CB4E00
+INFO:         GetSelectionSets = cfunction: 27CB4140
+INFO:         IsOverchargePaused = cfunction: 27CB4240
+INFO:         IsAutoMode = cfunction: 27CB4C80
+INFO:         IsDead = cfunction: 27CB4280
+INFO:         RemoveSelectionSet = cfunction: 27CB40C0
+INFO:         GetUnitId = cfunction: 27CB4DC0
+INFO:         GetArmy = cfunction: 27CB3700
+INFO:         __index = table: 25945EB0
+INFO:         IsStunned = cfunction: 27CB3340
+INFO:         ProcessInfo = cfunction: 27CB4CC0
+INFO:         IsAutoSurfaceMode = cfunction: 27CB4C40
+INFO:         IsInCategory = cfunction: 27CB33C0
+INFO:         HasUnloadCommandQueuedUp = cfunction: 27CB4D00
+INFO:         GetShieldRatio = cfunction: 27CB3680
+INFO:         GetCustomName = cfunction: 27CB4040
+INFO:         IsIdle = cfunction: 27CB42C0
+INFO:         GetMaxHealth = cfunction: 27CB41C0
+INFO:         IsRepeatQueue = cfunction: 27CB4C00
+INFO:         GetBlueprint = cfunction: 27CB4D40
+INFO:         GetFuelRatio = cfunction: 27CB36C0
+INFO:         GetEconData = cfunction: 27CB3600
+INFO:         GetPosition = cfunction: 27CB3740
+INFO:         GetCreator = cfunction: 27CB3780
+INFO:         AddSelectionSet = cfunction: 27CB4080
+INFO:         GetGuardedEntity = cfunction: 27CB37C0
+--]]
+
+
+
+
 
 
 --[[
@@ -135,6 +231,7 @@ function update()
 
 	-- calculate new values
 
+	-- economy totals are in resources/tick! (unit values are in resources/second, i.e. 10*resources/tick)
 	local econData = GetEconomyTotals()
     local simFrequency = GetSimTicksPerSecond()
 
@@ -168,7 +265,7 @@ function update()
         end
 
 		if rateVal < 0 then
-			if storedVal <= 2 then
+			if storedVal <= 0 then
 				-- we're stalling!
 				table.insert(data_y, -1)
 			else
@@ -214,7 +311,7 @@ function update()
 		mass = stored_mass + t/simFrequency*rate_mass -- convert back to mass/tick, TODO: do everything in seconds
 		if mass > max_mass_storage then
 			mass = -2 -- overflow
-		elseif mass < 0 then
+		elseif mass <= 0 then
 			mass = -1 -- stall
 		end
 
@@ -229,5 +326,40 @@ function update()
 		--data_x, data_y, econData.maxStorage.MASS)
 		data_predict_x, data_predict_y, econData.maxStorage.MASS)
 
-	--LOG_OBJ(econData)
+	
+
+	for _, resource in eco_types_sc do
+
+		local income_total = 0
+		local requested_total = 0
+		local consumed_total = 0
+
+		for _, unit in Units.Get() do
+			data = Units.Data(unit)
+			if data.econ then
+				income_total    = income_total	  + data.econ[resource..'Produced']
+				requested_total = requested_total + data.econ[resource..'Requested']
+				consumed_total  = consumed_total  + data.econ[resource..'Consumed']
+			else
+				LOG("unit "..unit:GetBlueprint().Description.." has no econ data")
+				LOG_OBJ(data)
+			end
+		end
+
+		--if resource == 'mass' then
+		--LOG(resource..":\tincome: "..tostring(income_total).."\trequested: "..tostring(requested_total).."\tconsumed: "..tostring(consumed_total).."\tin-cons: "..tostring(income_total-consumed_total).."\treq-cons: "..tostring(requested_total-consumed_total))
+		--end
+	end
+
+	--LOG_OBJ(GetEconomyTotals())
+
 end
+--[[
+INFO:         econ = table: 29F4DD48
+INFO:                 massRequested = 8
+INFO:                 energyConsumed = 70
+INFO:                 energyProduced = 10
+INFO:                 massConsumed = 8
+INFO:                 massProduced = 1
+INFO:                 energyRequested = 70
+--]]
