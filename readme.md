@@ -30,5 +30,10 @@ Heatmap:
 * resize heatmap when window/viewport is resized
 * add options (keymapping, resolution, colorscheme/mapping)
 
+Cluster Heatmap:
+* optimize clustering (maybe create a few discrete LOD levels)
+* find proper formula for cluster threshold (based on zoom, weighted position and mass)
+* implement for resource consumption too
+
 Permanent Limitations:
 * Reclaim info is very limited. Smaller trees and rocks etc. are not accessible from UI side.

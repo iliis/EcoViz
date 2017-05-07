@@ -176,7 +176,7 @@ function CreateModUI(parent)
 	-- TODO: hot to import this sim function? helpers.LOG_OBJ(GetUnitBlueprintByName('ueb1101'))
 
 
-	heatmap.createUI(parent)
+	--heatmap.createUI(parent)
 
 	
 	return resource_plot_widget
