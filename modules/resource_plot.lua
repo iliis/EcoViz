@@ -5,7 +5,8 @@ local UIUtil = import('/lua/ui/uiutil.lua')
 
 
 local plot = import('/mods/EcoPredict/modules/plot.lua')
-
+local heatmap = import('/mods/EcoPredict/modules/heatmap.lua')
+local helpers = import('/mods/EcoPredict/modules/helpers.lua')
 
 local Units = import('/mods/common/units.lua')
 
@@ -15,32 +16,6 @@ local eco_types    = {'MASS', 'ENERGY'}
 local eco_types_sc = {'mass', 'energy'}
 
 
-function LOG_OBJ(obj, show_methods, indentation)
-
-	if not indentation then
-		indentation = ""
-	end
-
-	if type(obj) == "table" then
-
-		--LOG(indentation.."properties of "..tostring(obj))
-
-		local o = obj
-		if show_methods then
-			o = getmetatable(obj)
-		end
-		
-		
-		for k, v in o do
-			LOG(indentation.."\t"..tostring(k).." = "..tostring(v))
-			if type(v) == "table" then
-				LOG_OBJ(v, show_methods, indentation.."\t")
-			end
-		end
-	else
-		LOG(tostring(obj))
-	end
-end
 
 
 
@@ -52,6 +27,33 @@ function SolidBackground(parent, control, color)
 	background.Right:Set(control.Right)
 	background.Bottom:Set(control.Bottom)
 	background.Depth:Set(function() return parent.Depth() + 1 end)
+end
+
+
+local Select = import('/mods/common/select.lua')
+function get_all_units()
+
+	-- return cached list of units (updated every 5 seconds or so?)
+	-- return Units.Get()
+
+	local units = nil
+	Select.Hidden(function()
+        units = {}
+        UISelectionByCategory("ALLUNITS", false, false, false, false)
+        for _, u in GetSelectedUnits() or {} do
+            units[u:GetEntityId()] = u
+        end
+    end)
+	return units
+end
+
+
+-- "<LOC uel0105_desc>Engineer" --> "Engineer"
+function format_description(desc)
+--return string.match(desc, '<.*>(.*)')
+--return desc:find('>')
+s, n = desc:gsub('<.*>', '')
+return s
 end
 
 
@@ -117,22 +119,64 @@ function CreateModUI(parent)
 
 
 
-	local us = Units.Get()
+	local us = get_all_units()
 	for _, unit in us do
 		LOG("------------------------------------------------")
 		LOG(unit:GetBlueprint().Description)
 		LOG("------------------------")
-		LOG_OBJ(Units.Data(unit))
-		LOG("---- methods:")
-		LOG_OBJ(unit, true)
+		helpers.LOG_OBJ(Units.Data(unit))
+		--LOG("---- methods:")
+		--helpers.LOG_OBJ(unit, true)
+
 		--LOG("---- eco data:")
-		--LOG_OBJ(unit:GetEconData())
+		--helpers.LOG_OBJ(unit:GetEconData())
+		LOG("---- work progress:", unit:GetWorkProgress())
+		LOG("---- command queue:")
+		for _, cmd in unit:GetCommandQueue() do
+			LOG("\t> command:")
+			LOG("\t\t"..repr(cmd))
+			--helpers.LOG_OBJ(cmd, false, "\t")
+			--LOG("\t\tfunctions():")
+			--helpers.LOG_OBJ(cmd, true,  "\t")
+			--LOG("\t\tblueprint:")
+			--helpers.LOG_OBJ(cmd.Blueprint)
+		end
+
+		if unit:GetFocus() then
+			LOG("---- focus: "..format_description(unit:GetFocus():GetBlueprint().Description))
+		end
+		--LOG_OBJ(unit:GetFocus())
+		--LOG_OBJ(unit:GetFocus(), true)
+
+		LOG("---- assisting me:")
+		helpers.LOG_OBJ(GetAssistingUnitsList(unit))
+		--helpers.LOG_OBJ(unit:GetFocus(), true)
 		
 		--LOG("---- blueprint:")
-		--LOG_OBJ(unit:GetBlueprint())
+		--helpers.LOG_OBJ(unit:GetBlueprint())
+
+		--LOG("---- by ID:")
+		--u = GetUnitById(unit:GetEntityId())
+		--helpers.LOG_OBJ(u)
+		--helpers.LOG_OBJ(u, true)
+		--helpers.LOG_OBJ(u:GetEconData())
+		
+		
+		
+		-- get build queue for current unit:
+		LOG("---- factory queue:")
+		helpers.LOG_OBJ(SetCurrentFactoryForQueueDisplay(unit))
+
+
+		unit:SetCustomName(format_description(unit:GetBlueprint().Description))
 	end
 
 	LOG("sim ticks / second: "..tostring(GetSimTicksPerSecond()))
+
+	-- TODO: hot to import this sim function? helpers.LOG_OBJ(GetUnitBlueprintByName('ueb1101'))
+
+
+	heatmap.createUI(parent)
 
 	
 	return resource_plot_widget
@@ -222,6 +266,37 @@ INFO:         stored = table: 29D3BC08
 INFO:                 MASS = 650
 INFO:                 ENERGY = 5000
 --]]
+
+
+
+function on_user_sync(sync)
+
+--[[
+if sync.CameraRequests and not table.emtpy(sync.CameraRequests) then
+	LOG("CAMERA REQUEST!")
+	helpers.LOG_OBJ(sync.CameraRequests)
+end
+--]]
+
+if not table.empty(sync.Reclaim) then
+	heatmap.updateReclaim(sync.Reclaim)
+end
+
+
+local print = false
+for k, v in sync do
+	if type(v) != 'table' or table.getn(v) > 0 then
+		print = true
+		break
+	end
+end
+
+if print then
+	LOG("--------------------------- on user sync:")
+	helpers.LOG_OBJ(sync)
+	helpers.LOG_OBJ(sync, true)
+end
+end
 
 
 
@@ -342,7 +417,7 @@ function update()
 				consumed_total  = consumed_total  + data.econ[resource..'Consumed']
 			else
 				LOG("unit "..unit:GetBlueprint().Description.." has no econ data")
-				LOG_OBJ(data)
+				helpers.LOG_OBJ(data)
 			end
 		end
 
@@ -351,7 +426,7 @@ function update()
 		--end
 	end
 
-	--LOG_OBJ(GetEconomyTotals())
+	--helpers.LOG_OBJ(GetEconomyTotals())
 
 end
 --[[

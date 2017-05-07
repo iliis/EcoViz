@@ -11,7 +11,7 @@ local colors = {
 }
 
 
-
+-- color is AARRGGBB
 function draw_box(parent, x1, y1, x2, y2, color, depth_offset)
 	b = Bitmap(parent)
 	b:SetSolidColor(color)
