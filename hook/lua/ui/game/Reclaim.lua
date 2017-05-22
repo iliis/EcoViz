@@ -1,4 +1,6 @@
 
+local reclaim_border_width = 2 -- in pixels
+
 -- everything closer than that will be merged into one blob
 local max_screen_dist = 10 -- in pixels
 
@@ -17,12 +19,20 @@ function CreateReclaimLabel(view)
 	--import('/mods/EcoPredict/modules/helpers.lua').LOG_OBJ(view.view, true)
 
     label.mass = Bitmap(label)
-    label.mass:SetSolidColor('c0c6fb08')
+    label.mass:SetSolidColor('ffc6fb08')
     LayoutHelpers.AtCenterIn(label.mass, label)
     label.mass.Height:Set(14)
     label.mass.Width:Set(14)
 	label.Height:Set(1)
 	label.Width:Set(1)
+	
+	label.border = Bitmap(label)
+	label.border:SetSolidColor('ff000000')
+	LayoutHelpers.AtCenterIn(label.border, label.mass)
+	label.border.Height:Set(function() return label.mass.Height()+reclaim_border_width*2 end)
+	label.border.Width :Set(function() return label.mass.Width()+reclaim_border_width*2 end)
+	label.border.Depth :Set(function() return label.mass.Depth()-1 end) -- border should be behind green box
+	
 
     
     label:DisableHitTest(true)
