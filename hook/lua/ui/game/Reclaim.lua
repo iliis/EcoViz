@@ -154,7 +154,7 @@ function UpdateLabels()
 					pos[2] = pos[2] + r.position[2] * r.mass
 					pos[3] = pos[3] + r.position[3] * r.mass
 				else
-					-- create new cluster
+					-- no nearby cluster found: create new one
 					clusterIndex = clusterIndex + 1
 					clusteredReclaim[clusterIndex] = createCluster(r)
 				end
