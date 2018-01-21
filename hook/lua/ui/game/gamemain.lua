@@ -20,18 +20,19 @@ function load_mod()
   widget.Width:Set(0)
   widget.Height:Set(0)
   
-  local rplot = import('/mods/EcoPredict/modules/resource_plot.lua')
-  rplot.CreateModUI(widget)
+  --local rplot = import('/mods/EcoPredict/modules/resource_plot.lua')
+  --rplot.CreateModUI(widget)
   
 end
 
+--[[
 function beat_func()
 	if widget then
 		local rplot = import('/mods/EcoPredict/modules/resource_plot.lua')
 		rplot.update()
 	end
 end
-
+--]]
 
 
 function create_button(parent, x, y, text)
@@ -72,16 +73,16 @@ function CreateUI(isReplay)
   
 	load_mod()
 
-	AddBeatFunction(beat_func)
+	--AddBeatFunction(beat_func)
   
 	create_button(GetFrame(0), 400, 60, 'reload mod').OnClick = function (self, modifiers)
-		LOG("reloading resource predictor")
+		LOG("reloading eco viz")
 		load_mod()
 	end
 
 	
 	create_button(GetFrame(0), 510, 60, 'hide mod').OnClick = function (self, modifiers)
-		LOG("hiding resource predictor")
+		LOG("hiding eco viz")
 		if widget then
 			widget:Destroy()
 			widget = nil

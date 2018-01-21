@@ -1,10 +1,10 @@
-name = "Eco Predict"
-uid = "8ffe5730-2ad3-4f5b-81b8-EcoPredictV1"
+name = "Eco Viz"
+uid = "8ffe5730-2ad3-4f5b-81b8-54-EcoViz-V1"
 version = 1
 copyright = "GPL v3"
-description = "Testing out a few things. Hopefully plot future (predicted) eco."
+description = "Visualizing your economy"
 author = "iliis"
-url = "https://github.com/iliis/ecopredict"
+url = "https://github.com/iliis/EcoViz"
 selectable = true
 enabled = true
 exclusive = false
