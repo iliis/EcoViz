@@ -3,15 +3,18 @@ local LayoutHelpers = import('/lua/maui/layouthelpers.lua')
 local Group = import('/lua/maui/group.lua').Group
 local Bitmap = import('/lua/maui/bitmap.lua').Bitmap
 
+---------------------------------------------------------------------------------------------------
+
 local originalCreateUI = CreateUI 
 
 local widget = nil
 
+---------------------------------------------------------------------------------------------------
 
 function load_mod()
 
   if widget then
-	widget:Destroy()
+    widget:Destroy()
   end
 
   widget = Group(GetFrame(0))
@@ -25,6 +28,8 @@ function load_mod()
   
 end
 
+---------------------------------------------------------------------------------------------------
+
 --[[
 function beat_func()
 	if widget then
@@ -34,6 +39,7 @@ function beat_func()
 end
 --]]
 
+---------------------------------------------------------------------------------------------------
 
 function create_button(parent, x, y, text)
 	button = Button(parent,
@@ -60,14 +66,11 @@ function create_button(parent, x, y, text)
 	return button
 end
 
-
+---------------------------------------------------------------------------------------------------
 
 function CreateUI(isReplay) 
 	originalCreateUI(isReplay) 
  
-  
-  
-
   
 	#KeyMapper.SetUserKeyAction('reload_ecopredict_ui', {action =  'import(\'/mods/EcoPredict/modules/resource_plot.lua\').CreateModUI()', category = 'user', order = 4})
   
@@ -91,9 +94,6 @@ function CreateUI(isReplay)
 
 end
 
-
-
-
-
+---------------------------------------------------------------------------------------------------
 
 		
