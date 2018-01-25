@@ -37,3 +37,31 @@ function LOG_OBJ(obj, show_methods, indentation)
 end
 
 ---------------------------------------------------------------------------------------------------
+
+function RAISE_EXCEPTION(msg)
+  WARN(msg)
+  local f = nil
+  f.lets_throw_an_error()
+end
+
+---------------------------------------------------------------------------------------------------
+
+function ASSERT(cond)
+  if not cond then
+    RAISE_EXCEPTION("Assertion violated!")
+  end
+end
+
+---------------------------------------------------------------------------------------------------
+
+function ASSERT_VECT(v)
+  ASSERT(v ~= nil and v[1] ~= nil and v[2] ~= nil and v[3] ~= nil)
+end
+
+---------------------------------------------------------------------------------------------------
+
+function vectostr(v)
+  return tostring(v[1]) .. ", " .. tostring(v[2]) .. ", " .. tostring(v[3])
+end
+
+---------------------------------------------------------------------------------------------------

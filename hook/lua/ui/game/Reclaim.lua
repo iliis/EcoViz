@@ -1,7 +1,7 @@
 local helpers = import('/mods/EcoViz/modules/helpers.lua')
 local bubble = import('/mods/EcoViz/modules/bubbleplot.lua')
 
-
+local NUM_LAYERS = 10
 
 local reclaim_bubble_plot = nil
 
@@ -10,6 +10,9 @@ function UpdateLabels()
   
   -- Layer for reclaim GUI
   -- view.ReclaimGroup
+  
+  --local zoom = GetCamera("WorldCamera"):GetZoom()
+  --LOG("current zoom: " .. tostring(zoom))
   
   if ReclaimChanged then
     for _, r in Reclaim do
@@ -29,8 +32,7 @@ local orig_initReclaimGroup = InitReclaimGroup
 function InitReclaimGroup(view)
   orig_initReclaimGroup(view)
 
-  if not reclaim_bubble_plot or IsDestroyed(reclaim_bubble_plot) then
-    reclaim_bubble_plot = bubble.BubbleLayer(view.ReclaimGroup, view, 'ffc6fb08')
-    reclaim_bubble_plot:updateValues(Reclaim)
+  if not reclaim_bubble_plot then
+    reclaim_bubble_plot = bubble.BubblePlot(NUM_LAYERS, view.ReclaimGroup, view, 'ffc6fb08')
   end
 end
