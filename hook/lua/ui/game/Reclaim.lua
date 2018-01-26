@@ -8,23 +8,11 @@ local reclaim_bubble_plot = nil
 function UpdateLabels()
   local view = import('/lua/ui/game/worldview.lua').viewLeft -- Left screen's camera
   
-  -- Layer for reclaim GUI
-  -- view.ReclaimGroup
-  
-  --local zoom = GetCamera("WorldCamera"):GetZoom()
-  --LOG("current zoom: " .. tostring(zoom))
-  
   if ReclaimChanged then
-    for _, r in Reclaim do
-      r.value = r.mass
-    end
-    
-    if reclaim_bubble_plot then
-      reclaim_bubble_plot:updateValues(Reclaim)
-    end
+    reclaim_bubble_plot:updateValues(Reclaim)
   end
   
-  reclaim_bubble_plot:renderLabels(MaxLabels)
+  reclaim_bubble_plot:renderLabels(MaxLabels, view)
 end
 
 
@@ -33,6 +21,6 @@ function InitReclaimGroup(view)
   orig_initReclaimGroup(view)
 
   if not reclaim_bubble_plot then
-    reclaim_bubble_plot = bubble.BubblePlot(NUM_LAYERS, view.ReclaimGroup, view, 'ffc6fb08')
+    reclaim_bubble_plot = bubble.BubblePlot(Reclaim, 'mass', NUM_LAYERS, view.ReclaimGroup, 'ffc6fb08')
   end
 end

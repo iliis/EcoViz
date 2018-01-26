@@ -20,7 +20,9 @@ local zoom_size_const = 1.2
 -- used to calculate on-screen distances based on world coordinates when no view is available
 -- this is used to cluster points when generating the layers
 -- one world unit was 18 pixels for me at zoom=5, but this probably depends on the resolution!
-local WORLD_DIST_TO_PX = 18 *5 * 10
+-- this is a fudge factor! adjust until it looks good ;)
+-- the smaller this value, the more aggressive the clustering (i.e. more points will be grouped into one)
+local WORLD_DIST_TO_PX = 18 * 5 * 15
 
 local LabelPool = {} -- Stores labels up too MaxLabels
 
@@ -58,6 +60,8 @@ end
 --[[
 
 This library plots a generic bubble plot.
+
+TODO: this docu is a bit outdated!
 
 API:
 
@@ -103,6 +107,7 @@ BubblePointLabel = Class(Group) {
     self.viewport = viewport
     
     self.bubble_point = bubble_point
+    helpers.ASSERT_VECT_NONZERO(self.bubble_point.weighted_pos)
     
     self.size = 10
     
@@ -143,6 +148,7 @@ BubblePointLabel = Class(Group) {
   
   SetData = function(self, bubble_point)
     self.bubble_point = bubble_point
+    helpers.ASSERT_VECT_NONZERO(self.bubble_point.weighted_pos)
     if self:IsHidden() then
       self:Show()
     end
@@ -150,6 +156,8 @@ BubblePointLabel = Class(Group) {
   end,
   
   Update = function(self)
+    helpers.ASSERT_VECT_NONZERO(self.bubble_point.weighted_pos)
+    
     self.screen_pos = self.viewport:Project(self.bubble_point.weighted_pos)
     -- align label to pixels
     self.screen_pos.x = math.round(self.screen_pos.x)
@@ -177,8 +185,7 @@ BubblePointLabel = Class(Group) {
 -- a single 'Bubble' (rendered as a square label)
 
 BubblePoint = Class() {
-	__init = function(self, viewport, world_position, color, self_value)
-    self.viewport = viewport
+	__init = function(self, world_position, color, self_value)
     self.proj = nil
     self.world_pos    = world_position
     self.weighted_pos = world_position
@@ -200,24 +207,33 @@ BubblePoint = Class() {
     local value_sum = self.self_value
     
     for _, c in self.children do
-      pos_sum   = VAdd(pos_sum, VMult(c.world_pos, c:value()))
+       helpers.ASSERT_VECT(pos_sum)
+      pos_sum   = VAdd(pos_sum, VMult(c.weighted_pos, c:value()))
       --LOG("adding " .. helpers.vectostr(c.world_pos) .. " * " .. tostring(c:value()) .. " = " .. helpers.vectostr(pos_sum))
       value_sum = value_sum + c:value()
     end
     
     if value_sum ~= 0 then
       local result = VMult(pos_sum, 1/value_sum)
-      --LOG("result: " .. helpers.vectostr(result))
+      if result[1] == 0 then
+        WARN("invalid result in weighted pos:")
+        LOG("result: " .. helpers.vectostr(result))
+        LOG("pos_sum: " .. helpers.vectostr(pos_sum))
+        LOG("value_sum: " .. tostring(value_sum))
+        helpers.LOG_OBJ(self)
+      end
+      helpers.ASSERT_VECT_NONZERO(result)
       return result
     else
+      WARN('value sum is 0 in BubblePoint::weightedPos()')
       return self.world_pos
     end
   end,
   
-  IsInView = function(self)
-    local screen_pos = self.viewport:Project(self.weighted_pos)
+  IsInView = function(self, viewport)
+    local screen_pos = viewport:Project(self.weighted_pos)
     -- TODO: take size into account
-    return self.viewport:HitTest(screen_pos.x, screen_pos.y)
+    return viewport:HitTest(screen_pos.x, screen_pos.y)
   end,
   
   SetValue = function(self, value)
@@ -233,14 +249,17 @@ BubblePoint = Class() {
       return
     end
     
-    local oldn = table.getsize(self.children)
-    
-    table.insert(self.children, child)
-    child.parent = self
-    
-    if oldn+1 ~= table.getsize(self.children) then
-      helpers.RAISE_EXCEPTION("AddChild failed!")
+    if table.find(self.children, child) == nil then
+      table.insert(self.children, child)
+    else
+      WARN("Trying to append child twice!")
+      LOG("self:")
+      helpers.LOG_OBJ(self)
+      LOG("child:")
+      helpers.LOG_OBJ(child)
     end
+    
+    child.parent = self
   end,
   
   ChildCount = function(self)
@@ -269,6 +288,7 @@ BubblePoint = Class() {
     end
     
     self.weighted_pos = self:weightedPos()
+    helpers.ASSERT_VECT(self.weighted_pos)
   end,
 
 }
@@ -278,10 +298,9 @@ BubblePoint = Class() {
 -- can render those points as labels, taking visibility into account
 
 BubbleLayer = Class() {
-	__init = function(self, gui_parent, viewport, color, zoom_min, zoom_max)
+	__init = function(self, gui_parent, color, zoom_min, zoom_max)
     
     self.gui_parent = gui_parent
-    self.viewport = viewport
     self.color = color
     
     self.bubble_points = {}
@@ -302,45 +321,11 @@ BubbleLayer = Class() {
     return true
   end,
   
-  updateValues = function(self, data)
-    local data_cnt = 0
-    for id, d in data do
-      data_cnt = data_cnt + 1
-      local bubble = self.bubble_points[id]
-      if d.value then
-        
-        if bubble == nil then
-          
-          if d.position[1] == nil then
-            LOG("invalid position!")
-            helpers.LOG_OBJ(d)
-            LOG("pos:")
-            helpers.LOG_OBJ(d.position)
-          end
-          
-          bubble = BubblePoint(self.viewport, d.position, self.color, d.value)
-          self.bubble_points[id] = bubble
-        end
-        
-        bubble:SetValue(d.value)
-      else
-        if bubble then
-          bubble:SetValue(0)
-          self.bubble_points[id] = nil
-        end
-      end
-    end
-    
-    -- build tree
-    LOG("clustering layer...")
-    self:clusterPoints()
-    
-    --LOG("updated with " .. tostring(data_cnt) .. " datapoints")
-  end,
-  
   -- group points into clusters
-  clusterPoints = function(self)
+  clusterPoints = function(self, data)
     local zoom = (self.zoom_min + self.zoom_max)/2
+    
+    LOG("clustering layer with " .. tostring(table.getsize(data)) .. " datapoints and zoom = " .. tostring(zoom))
     --local zoom_sq = zoom*zoom
     
     local close_enough = function(p1, p2)
@@ -348,19 +333,17 @@ BubbleLayer = Class() {
       local dist = VDist3(p1.weighted_pos, p2.weighted_pos) * WORLD_DIST_TO_PX
       local good = dist / zoom  <  max_screen_dist + math.sqrt(p1:value()) + math.sqrt(p2:value())
       
-      --[[
-      if good then
-        LOG(tostring(p1) .. " - " .. tostring(p2) .. ": distance = " .. tostring(dist) .. " / zoom = " .. tostring(dist/zoom) .. " <= " .. tostring(max_screen_dist + math.sqrt(p1:value()) + math.sqrt(p2:value())))
-      end
-      --]]
+      --LOG(tostring(good) .. ": " .. tostring(p1) .. " - " .. tostring(p2) .. ": distance = " .. tostring(dist) .. " / zoom = " .. tostring(dist/zoom) .. " < " .. tostring(max_screen_dist + math.sqrt(p1:value()) + math.sqrt(p2:value())))
       
       return good
     end
     
+    data = table.copy(data) -- create shallow copy so we can remove elements
+    
     local new_points = {}
-    while not table.empty(self.bubble_points) do
+    while not table.empty(data) do
       -- pop a point and create cluster with it
-      local pivot = table.pop_last(self.bubble_points)
+      local pivot = table.pop_last(data)
       
       --LOG("empty? " .. tostring(table.empty(self.bubble_points)) .. ", number of elements: " .. tostring(table.getsize_nonnil(self.bubble_points)))
       --LOG("clustering based on " .. tostring(pivot))
@@ -369,22 +352,33 @@ BubbleLayer = Class() {
         continue
       end
       
-      local cluster = BubblePoint(self.viewport, Vector(0,0,0), self.color, 0)
+      local cluster = BubblePoint(Vector(0,0,0), self.color, 0)
       cluster:AddChild(pivot)
       
       -- find points that are close to 'pt' and merge them
-      for idx, p in self.bubble_points do
+      for idx, p in data do
         if close_enough(p, pivot) then
           cluster:AddChild(p)
-          self.bubble_points[idx] = nil
+          data[idx] = nil
         end
       end
       
       if cluster:ChildCount() == 1 then
         -- no need to create cluster for a single point
+        helpers.ASSERT_VECT_NONZERO(pivot.weighted_pos)
         table.insert(new_points, pivot)
       else
+        --LOG("cluster:")
+        --helpers.LOG_OBJ(cluster)
         cluster:Update()
+        
+        if cluster.weighted_pos[1] == 0 then
+          WARN("invalid weighted pos")
+          LOG(cluster)
+          helpers.LOG_OBJ(cluster)
+        end
+
+        helpers.ASSERT_VECT_NONZERO(cluster.weighted_pos)
         table.insert(new_points, cluster)
       end
       
@@ -402,18 +396,19 @@ BubbleLayer = Class() {
     LOG(" -> clustered into " .. tostring(table.getsize(new_points)) .. " clusters")
   end,
   
-  renderLabels = function(self, MaxLabels)
-    local view = import('/lua/ui/game/worldview.lua').viewLeft -- Left screen's camera
+  renderLabels = function(self, MaxLabels, viewport)
+    --local view = import('/lua/ui/game/worldview.lua').viewLeft -- Left screen's camera
     
     local onScreenIndex = 1
     local onScreenLabels = {}
 
     -- One might be tempted to use a binary insert; however, tests have shown that it takes about 140x more time
     for _, r in self.bubble_points do
-        if r:IsInView() then
-            onScreenLabels[onScreenIndex] = r
-            onScreenIndex = onScreenIndex + 1
-        end
+      helpers.ASSERT_VECT_NONZERO(r.weighted_pos)
+      if r:IsInView(viewport) then
+          onScreenLabels[onScreenIndex] = r
+          onScreenIndex = onScreenIndex + 1
+      end
     end
 
     table.sort(onScreenLabels, function(a, b) return a:value() > b:value() end)
@@ -433,8 +428,9 @@ BubbleLayer = Class() {
         end
         
         if not label then
-            --label = CreateReclaimLabel(view.ReclaimGroup, r)
-            label = BubblePointLabel(self.gui_parent, view, r, self.color)
+            helpers.ASSERT_VECT_NONZERO(r.weighted_pos)
+            -- (parent, viewport, bubble_point, color)
+            label = BubblePointLabel(self.gui_parent, viewport, r, self.color)
             LabelPool[labelIndex] = label
         end
 
@@ -443,8 +439,8 @@ BubbleLayer = Class() {
     end
     
     
-    LOG("rendered " .. tostring(labelIndex) .. " labels from " .. tostring(table.getsize(onScreenLabels))
-      .. " points on screen from " .. tostring(table.getsize(self.bubble_points)) .. " points in current layer")
+    --LOG("rendered " .. tostring(labelIndex) .. " labels from " .. tostring(table.getsize(onScreenLabels))
+    --  .. " points on screen from " .. tostring(table.getsize(self.bubble_points)) .. " points in current layer")
 
     -- Hide labels we didn't use
     for index = labelIndex, MaxLabels do
@@ -465,11 +461,16 @@ BubbleLayer = Class() {
 -- full, hierarchical bubble plot
 
 BubblePlot = Class() {
-  __init = function(self, layer_count, gui_parent, viewport, color)
+  __init = function(self, data, data_field, layer_count, gui_parent, color)
     
     local camera = GetCamera("WorldCamera")
     local min_zoom = camera:GetMinZoom()-1
     local max_zoom = camera:GetMaxZoom()+10
+    
+    self.raw_data = nil
+    self.raw_data_field = data_field
+    
+    self.color = color
     
     self.layers = {}
     for layer_idx = 0, layer_count-1 do
@@ -480,16 +481,19 @@ BubblePlot = Class() {
             
       --LOG("building layer No. " .. tostring(layer_idx) .. " for range " .. tostring(min_z) .. " to " .. tostring(max_z))
       
-      self.layers[layer_idx] = BubbleLayer(gui_parent, viewport, color, min_z, max_z)
+      self.layers[layer_idx] = BubbleLayer(gui_parent, color, min_z, max_z)
     end
+    
+    self:updateValues(data)
   end,
   
-  renderLabels = function(self, MaxLabels)
+  renderLabels = function(self, MaxLabels, viewport)
     local zoom = GetCamera("WorldCamera"):GetZoom()
     -- find layer which corresponds to current zoom level
     for idx, layer in self.layers do
       if layer:isInZoomRange(zoom) then
-        layer:renderLabels(MaxLabels)
+        --LOG("rendering layer " .. tostring(idx) .. " with " .. tostring(table.getsize(layer.bubble_points)) .. " datapoints")
+        layer:renderLabels(MaxLabels, viewport)
         return
       end
     end
@@ -498,9 +502,52 @@ BubblePlot = Class() {
   end,
   
   updateValues = function(self, data)
-    for _, layer in self.layers do
-      layer:updateValues(data)
+    if table.empty(data) then
+      WARN('got empty dataset for BubblePlot::updateValues(), not updating')
+      return
     end
+    
+    --[[
+    LOG("updating bubble plot with " .. tostring(table.getsize(data)) .. " datapoints")
+    local data_changed = self.raw_data == nil
+    if not data_changed then
+      for id, d in data do
+        local orig = self.raw_data[id]
+        if orig == nil or d[self.raw_data_field] ~= orig[self.raw_data_field] then
+          data_changed = true
+          break
+        end
+      end
+    end
+    
+    if not data_changed then
+      helpers.ASSERT(table.getsize(data) == table.getsize(self.raw_data))
+    end
+    
+    if data_changed then
+    --]]
+      LOG("got new data! rebuilding tree...")
+      self.raw_data = table.copy(data)
+      
+      -- buil first layer directly from raw data
+      
+      -- clear first layer
+      self.layers[0].bubble_points = {}
+      
+      -- insert points from data
+      for _, d in self.raw_data do
+        table.insert(self.layers[0].bubble_points, BubblePoint(d.position, self.color, d[self.raw_data_field])) --pt, col, val
+      end
+      
+      -- cluster up from first layer
+      for i, l in self.layers do
+        if i == 0 then
+          continue
+        end
+        
+        l:clusterPoints(self.layers[i-1].bubble_points) -- cluster up from prev. layer
+      end
+    --end
   end,
 }
 

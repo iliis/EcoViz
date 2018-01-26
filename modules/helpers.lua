@@ -20,10 +20,12 @@ function LOG_OBJ(obj, show_methods, indentation)
 		for k, v in o do
 			if type(v) == "table" then
 
-				if table.getn(v) == 0 then
-					LOG(indentation.."\t"..tostring(k).." = { }")
+				if table.getsize(v) == 0 then
+					LOG(indentation.."\t"..tostring(k).." = "..tostring(v).." { }")
+        elseif k == 'parent' then
+          LOG(indentation.."\t"..tostring(k).." = "..tostring(v).." { <omitted> }") -- prevent infinite recursion ;)
 				else
-					LOG(indentation.."\t"..tostring(k).." = {")
+					LOG(indentation.."\t"..tostring(k).." = "..tostring(v).." {")
 					LOG_OBJ(v, show_methods, indentation.."\t")
 					LOG(indentation.."\t}")
 				end
@@ -55,7 +57,18 @@ end
 ---------------------------------------------------------------------------------------------------
 
 function ASSERT_VECT(v)
-  ASSERT(v ~= nil and v[1] ~= nil and v[2] ~= nil and v[3] ~= nil)
+  if v == nil then
+    RAISE_EXCEPTION('vector is nil!')
+  else
+    ASSERT(v[1] ~= nil and v[2] ~= nil and v[3] ~= nil)
+  end
+end
+
+---------------------------------------------------------------------------------------------------
+
+function ASSERT_VECT_NONZERO(v)
+  ASSERT_VECT(v)
+  ASSERT(v[1] ~= 0 and v[2] ~= 0 and v[3] ~= 0)
 end
 
 ---------------------------------------------------------------------------------------------------
