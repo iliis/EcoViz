@@ -22,7 +22,7 @@ function LOG_OBJ(obj, show_methods, indentation)
 
 				if table.getsize(v) == 0 then
 					LOG(indentation.."\t"..tostring(k).." = "..tostring(v).." { }")
-        elseif k == 'parent' then
+        elseif k == 'parent' or k == 'gui_parent' then
           LOG(indentation.."\t"..tostring(k).." = "..tostring(v).." { <omitted> }") -- prevent infinite recursion ;)
 				else
 					LOG(indentation.."\t"..tostring(k).." = "..tostring(v).." {")
@@ -69,6 +69,20 @@ end
 function ASSERT_VECT_NONZERO(v)
   ASSERT_VECT(v)
   ASSERT(v[1] ~= 0 and v[2] ~= 0 and v[3] ~= 0)
+end
+
+---------------------------------------------------------------------------------------------------
+
+function ASSERT_UNIQUE_SET(t)
+  t = table.copy(t)
+  --table.sort(t, function(a, b) return t > b:value() end)
+  local last_v = nil
+  for _, v in t do
+    if last_v then
+      ASSERT(last_v ~= v)
+    end
+    last_v = v
+  end
 end
 
 ---------------------------------------------------------------------------------------------------

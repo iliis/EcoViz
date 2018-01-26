@@ -99,6 +99,8 @@ ValueObject = Class() {
 --]]
 
 ---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
 
 BubblePointLabel = Class(Group) {
   __init = function(self, parent, viewport, bubble_point, color)
@@ -142,9 +144,13 @@ BubblePointLabel = Class(Group) {
     self:DisableHitTest(true)
   end,
   
+  -------------------------------------------------------------------------------------------------
+  
   IsInView = function(self)
     return self.viewport:HitTest(self.screen_pos.x, self.screen_pos.y)
   end,
+  
+  -------------------------------------------------------------------------------------------------
   
   SetData = function(self, bubble_point)
     self.bubble_point = bubble_point
@@ -154,6 +160,8 @@ BubblePointLabel = Class(Group) {
     end
     self:Update()
   end,
+  
+  -------------------------------------------------------------------------------------------------
   
   Update = function(self)
     helpers.ASSERT_VECT_NONZERO(self.bubble_point.weighted_pos)
@@ -172,15 +180,22 @@ BubblePointLabel = Class(Group) {
     self.lbl_fill.Left:Set(self.screen_pos.x - math.round(self.size/2))
     self.lbl_fill.Top :Set(self.screen_pos.y - math.round(self.size/2))
 	end,
+  
+  -------------------------------------------------------------------------------------------------
 
   OnFrame = function(self, delta)
       self:Update()
   end,
   
+  -------------------------------------------------------------------------------------------------
+  
   OnHide = function(self, hidden)
     self:SetNeedsFrameUpdate(not hidden)
   end,
 }
+
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 -- a single 'Bubble' (rendered as a square label)
 
@@ -198,9 +213,13 @@ BubblePoint = Class() {
     self.total_value = self_value
   end,
   
+  -------------------------------------------------------------------------------------------------
+  
   value = function(self)
     return self.total_value
   end,
+  
+  -------------------------------------------------------------------------------------------------
   
   weightedPos = function(self)
     local pos_sum   = VMult(self.world_pos, self.self_value)
@@ -225,10 +244,12 @@ BubblePoint = Class() {
       helpers.ASSERT_VECT_NONZERO(result)
       return result
     else
-      WARN('value sum is 0 in BubblePoint::weightedPos()')
+      --WARN('value sum is 0 in BubblePoint::weightedPos()')
       return self.world_pos
     end
   end,
+  
+  -------------------------------------------------------------------------------------------------
   
   IsInView = function(self, viewport)
     local screen_pos = viewport:Project(self.weighted_pos)
@@ -236,16 +257,29 @@ BubblePoint = Class() {
     return viewport:HitTest(screen_pos.x, screen_pos.y)
   end,
   
+  -------------------------------------------------------------------------------------------------
+  
+  DistTo = function(self, other)
+    helpers.ASSERT_VECT_NONZERO(self.weighted_pos)
+    helpers.ASSERT_VECT_NONZERO(other.weighted_pos)
+    
+    return VDist3(self.weighted_pos, other.weighted_pos)
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
   SetValue = function(self, value)
     if value ~= self.self_value then
       self.self_value = value
-      self:Update()
+      self:UpdateTotalValue()
     end
   end,
   
+  -------------------------------------------------------------------------------------------------
+  
   AddChild = function(self, child)
     if child == self or child.parent == self then
-      WARN("Trying to append child to itself or its own parent!")
+      helpers.RAISE_EXCEPTION("Trying to append child to itself or its own parent!")
       return
     end
     
@@ -262,12 +296,28 @@ BubblePoint = Class() {
     child.parent = self
   end,
   
+  -------------------------------------------------------------------------------------------------
+  
+  RemoveChild = function(self, child)
+    local idx = table.find(self.children, child)
+    if not idx then
+      WARN("Cannot remove child: not a child of this node!")
+      return
+    end
+    child.parent = nil
+    self.children[idx] = nil
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
   ChildCount = function(self)
     --LOG("AddChild: have now " .. tostring(table.getsize(self.children)) .. " children")
     return table.getsize(self.children)
   end,
   
-  Update = function(self)
+  -------------------------------------------------------------------------------------------------
+  
+  UpdateTotalValue = function(self)
     self.total_value = self.self_value
     for id, c in self.children do
       if c and c:value() ~= 0 then
@@ -278,21 +328,24 @@ BubblePoint = Class() {
       end
     end
     
+    --[[
     if self.parent then
-      self.parent:Update()
+      self.parent:UpdateTotalValue()
       
       if self.total_value == 0 then
         -- this bubble plopped, remove myself from tree
         self.parent = nil
       end
     end
+    --]]
     
     self.weighted_pos = self:weightedPos()
     helpers.ASSERT_VECT(self.weighted_pos)
   end,
-
 }
 
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 -- a single zoom-level consisting of many (possibly aggregated) BubblePoints
 -- can render those points as labels, taking visibility into account
@@ -302,45 +355,299 @@ BubbleLayer = Class() {
     
     self.gui_parent = gui_parent
     self.color = color
+    self.parent_layer = nil
     
     self.bubble_points = {}
     
     self.zoom_min = zoom_min
     self.zoom_max = zoom_max
+    self.zoom = (self.zoom_min + self.zoom_max)/2
   end,
   
-  isInZoomRange = function(self, zoom)
-    if self.zoom_min and zoom < self.zoom_min then
+  -------------------------------------------------------------------------------------------------
+  
+  isInZoomRange = function(self, z)
+    if self.zoom_min and z < self.zoom_min then
       return false
     end
     
-    if self.zoom_max and zoom > self.zoom_max then
+    if self.zoom_max and z > self.zoom_max then
       return false
     end
     
     return true
   end,
   
+  -------------------------------------------------------------------------------------------------
+  
+  -------------------------------------------------------------------------------------------------
+  
+  close_enough = function(self, dist, p1, p2)
+    
+    helpers.ASSERT(dist)
+    helpers.ASSERT(p1)
+    helpers.ASSERT(p2)
+    
+    -- TODO: use VDist3sq and do away with math.sqrt() somehow
+    
+    local good = dist * WORLD_DIST_TO_PX / self.zoom  <  max_screen_dist + math.sqrt(p1:value()) + math.sqrt(p2:value())
+    
+    --LOG(tostring(good) .. ": " .. tostring(p1) .. " - " .. tostring(p2) .. ": distance = " .. tostring(dist) .. " / zoom = " .. tostring(dist/zoom) .. " < " .. tostring(max_screen_dist + math.sqrt(p1:value()) + math.sqrt(p2:value())))
+    
+    return good
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
+  find_closest = function(self, bubble)
+    helpers.ASSERT(bubble)
+    
+    local best_pt = nil
+    local best_dist = nil
+    
+    for idx, b in self.bubble_points do
+      if b ~= bubble then
+        local dist = bubble:DistTo(b)
+        if not best_dist or best_dist > dist then
+          best_dist = dist
+          best_pt = b
+        end
+      end
+    end
+    
+    if best_dist and self:close_enough(best_dist, bubble, best_pt) then
+      return best_pt
+    else
+      return nil
+    end
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  -- search for a point from layer below in this layer
+  --[[
+  find_child = function(self, bubble)
+    helpers.ASSERT(bubble)
+    for c_idx, c in self.bubble_points do
+      if table.find(c.children, bubble) then
+        return c_idx
+      end
+    end
+    return nil
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
+  reclusterPointRecursively = function(self, node_current)
+    LOG("reclustering " .. tostring(node_current) .. " with value " .. tostring(node_current:value()))
+    
+    -- remove current node from tree
+    
+  end,
+  
+  
+  -- TODO: document this!
+  reclusterPointRecursively_orig = function(self, node_child)
+    
+    LOG("reclustering " .. tostring(node_child) .. " with value " .. tostring(node_child:value()))
+    
+    -- check if new bubble (child) is already part of this layer
+    local local_idx = self:find_child(node_child)
+    if local_idx then
+      
+      -- recluster bubble by splitting it into components
+      -- TODO: this assumes bubble is a *cluster* (i.e. has self_value = 0)
+      
+      local node_current = self.bubble_points[local_idx]
+      
+      LOG(" --> splitting up existing cluster into " .. tostring(table.getsize(node_current.children)) .. " points")
+      
+      
+      local node_parent = node_current.parent
+     
+      -- remove curent node from this layer
+      self.bubble_points[local_idx] = nil
+      
+      -- check if we can remove it entirely
+      node_current:UpdateTotalValue()
+      
+      if node_current:value() == 0 then
+        LOG(" --> removing cluster as it only contains single bubble which was removed")
+        
+        if node_parent then
+          helpers.ASSERT(self.parent_layer)
+          self.parent_layer:reclusterPointRecursively(node_current)
+        end
+        
+        return
+      end
+      
+      -- remove old cluster from tree
+      if node_parent then
+        node_parent:RemoveChild(node_current)
+        node_parent:UpdateTotalValue() -- required if no children get clustered to node_parent
+      else
+        helpers.ASSERT(not self.parent_layer)
+      end
+      
+      -- now add children again
+      local new_clusters = {}
+      for _, c in node_current.children do
+        if c:value() ~= 0 then
+          helpers.ASSERT_VECT_NONZERO(c.weighted_pos)
+          LOG("    --> reinserting child with value " .. tostring(c:value()))
+          
+          table.insert(new_clusters, self:clusterNewPointIntoLayer(c))
+        end
+      end
+      
+      if self.parent_layer then
+        LOG("recusrively recluster those again in parent")
+        for _, new_cluster in new_clusters do
+          self.parent_layer:reclusterPointRecursively(new_cluster)
+        end
+        
+        if not table.find(new_clusters, node_parent) then
+          self.parent_layer:reclusterPointRecursively(node_parent)
+        end
+      end
+    else
+      
+      if node_child:value() == 0 then
+        LOG(" --> not adding, value is zero")
+      else
+        
+        -- add bubble to existing/new cluster in this layer
+        LOG(" --> adding as new point")
+        node_child = self:clusterNewPointIntoLayer(node_child)
+        if self.parent_layer then
+          LOG("recusrively adding new cluster")
+          self.parent_layer:reclusterPointRecursively(chnode_childild)
+        end
+      end
+    end
+  end,
+  --]]
+  
+  -------------------------------------------------------------------------------------------------
+  -- merge two bubble points into one (B into A)
+  -- doesn't change rest of tree (apart from parent/children)
+  
+  mergeNodes = function(self, A, B)
+    if A.parent ~= B.parent then
+      -- nodes in the same layer always have both or neither a parent
+      helpers.ASSERT(A.parent)
+      helpers.ASSERT(B.parent)
+      helpers.ASSERT(self.parent_layer)
+      self.parent_layer:mergeNodes(A.parent, B.parent)
+    end
+      
+    -- delete B from parent
+    if B.parent then
+      B.parent:RemoveChild(B)
+    end
+    
+    -- delete from current layer
+    self.bubble_points[table.find(self.bubble_points, B)] = nil
+    
+    -- add all children from B to A
+    for _, c in B.children do
+      A:AddChild(c)
+    end
+    
+    LOG("merging B (" .. tostring(B) .. " = " .. tostring(B:value()) .. ") into A (" .. tostring(A) .. " = " .. tostring(A:value()) .. ") -> ")
+    
+    A:UpdateTotalValue()
+    LOG("    -> A = " .. tostring(B:value()))
+    
+    return A
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  -- check if 'bubble' can be merged with any neighbors and check reslting parents as well
+  mergeRecursively = function(self, bubble)
+    helpers.ASSERT(bubble)
+    
+    -- update, in case no closest value will be found
+    -- and to make sure weighted_pos is up-to-date
+    bubble:UpdateTotalValue()
+    
+    while true do
+      local closest = self:find_closest(bubble)
+      if not closest then
+        break
+      else
+        self:mergeNodes(bubble, closest)
+      end
+    end
+    
+    if self.parent_layer then
+      self.parent_layer:mergeRecursively(bubble.parent)
+    end
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  -- insert bubble from layer below into current layer
+  -- either merges it into existing cluster (and updates their parents if recursive=true)
+  -- or creates a new bubble in current layer (and inserts it into parent layer if recursive=true)
+  
+  clusterChildIntoLayer = function(self, point, recursive)
+    
+    helpers.ASSERT_VECT_NONZERO(point.weighted_pos)
+    
+    --LOG("clustering new point with value = " .. tostring(point:value()))
+    
+    local cluster = self:find_closest(point)
+    
+    --LOG("clustering piont " .. tostring(point) .. " into layer with " .. tostring(table.getsize(self.bubble_points)) .. " clusters")
+    --LOG(" -> found close enough: " .. tostring(cluster))
+    
+    if cluster ~= nil and point.parent == cluster then
+      WARN("invalid point to add, already added!")
+    end
+    
+    local new_cluster = false
+    if not cluster then
+      new_cluster = true
+      -- no existing cluster found where we could add this point, create new one
+      cluster = BubblePoint(Vector(0,0,0), self.color, 0)
+      table.insert(self.bubble_points, cluster)
+      LOG(" --> adding to new cluster " .. tostring(cluster))
+    else
+      LOG(" --> adding to existing cluster " .. tostring(cluster) .. " with value = " .. tostring(cluster:value()) .. " and " .. tostring(table.getsize(cluster.children)) .. " children")
+    end
+    
+    cluster:AddChild(point)
+    cluster:UpdateTotalValue()
+    helpers.ASSERT_VECT_NONZERO(cluster.weighted_pos)
+    
+    LOG("     --> cluster now has value = " .. tostring(cluster:value()) .. " and " .. tostring(table.getsize(cluster.children)) .. " children")
+    
+    if recursive then
+      if new_cluster then
+        -- we created a new cluster in current layer -> insert into parent layer too
+        if self.parent_layer then
+          self.parent_layer:clusterChildIntoLayer(cluster, true)
+        end
+      else
+        -- we enlarged 'cluster', maybe it now merges with neighbors
+        self:mergeRecursively(cluster)
+      end
+    end
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
   -- group points into clusters
   clusterPoints = function(self, data)
-    local zoom = (self.zoom_min + self.zoom_max)/2
+    helpers.ASSERT_UNIQUE_SET(data)
     
-    LOG("clustering layer with " .. tostring(table.getsize(data)) .. " datapoints and zoom = " .. tostring(zoom))
+    LOG("clustering layer with " .. tostring(table.getsize(data)) .. " datapoints and zoom = " .. tostring(self.zoom))
     --local zoom_sq = zoom*zoom
     
-    local close_enough = function(p1, p2)
-      -- TODO: use VDist3sq and do away with math.sqrt() somehow
-      local dist = VDist3(p1.weighted_pos, p2.weighted_pos) * WORLD_DIST_TO_PX
-      local good = dist / zoom  <  max_screen_dist + math.sqrt(p1:value()) + math.sqrt(p2:value())
-      
-      --LOG(tostring(good) .. ": " .. tostring(p1) .. " - " .. tostring(p2) .. ": distance = " .. tostring(dist) .. " / zoom = " .. tostring(dist/zoom) .. " < " .. tostring(max_screen_dist + math.sqrt(p1:value()) + math.sqrt(p2:value())))
-      
-      return good
-    end
     
     data = table.copy(data) -- create shallow copy so we can remove elements
     
-    local new_points = {}
+    self.bubble_points = {} -- clear existing clustering
     while not table.empty(data) do
       -- pop a point and create cluster with it
       local pivot = table.pop_last(data)
@@ -352,49 +659,14 @@ BubbleLayer = Class() {
         continue
       end
       
-      local cluster = BubblePoint(Vector(0,0,0), self.color, 0)
-      cluster:AddChild(pivot)
-      
-      -- find points that are close to 'pt' and merge them
-      for idx, p in data do
-        if close_enough(p, pivot) then
-          cluster:AddChild(p)
-          data[idx] = nil
-        end
-      end
-      
-      if cluster:ChildCount() == 1 then
-        -- no need to create cluster for a single point
-        helpers.ASSERT_VECT_NONZERO(pivot.weighted_pos)
-        table.insert(new_points, pivot)
-      else
-        --LOG("cluster:")
-        --helpers.LOG_OBJ(cluster)
-        cluster:Update()
-        
-        if cluster.weighted_pos[1] == 0 then
-          WARN("invalid weighted pos")
-          LOG(cluster)
-          helpers.LOG_OBJ(cluster)
-        end
-
-        helpers.ASSERT_VECT_NONZERO(cluster.weighted_pos)
-        table.insert(new_points, cluster)
-      end
-      
-      --LOG("     = " .. tostring(cluster:ChildCount()))
-      
-      
-      --cluster.weighted_pos = pivot.world_pos
-      --LOG(" --> clustered " .. tostring(table.getsize(cluster.children)) .. " points into one at " .. tostring(cluster.weighted_pos.x) .. ", " .. tostring(cluster.weighted_pos.y))
-      --LOG("     = " .. tostring(cluster:ChildCount()))
-      
+      self:clusterChildIntoLayer(pivot, false)
     end
     
-    self.bubble_points = new_points
-    
-    LOG(" -> clustered into " .. tostring(table.getsize(new_points)) .. " clusters")
+    LOG(" -> clustered into " .. tostring(table.getsize(self.bubble_points)) .. " clusters")
+    helpers.ASSERT_UNIQUE_SET(self.bubble_points)
   end,
+  
+  -------------------------------------------------------------------------------------------------
   
   renderLabels = function(self, MaxLabels, viewport)
     --local view = import('/lua/ui/game/worldview.lua').viewLeft -- Left screen's camera
@@ -458,6 +730,8 @@ BubbleLayer = Class() {
 }
 
 ---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
 -- full, hierarchical bubble plot
 
 BubblePlot = Class() {
@@ -482,10 +756,15 @@ BubblePlot = Class() {
       --LOG("building layer No. " .. tostring(layer_idx) .. " for range " .. tostring(min_z) .. " to " .. tostring(max_z))
       
       self.layers[layer_idx] = BubbleLayer(gui_parent, color, min_z, max_z)
+      if layer_idx > 0 then
+        self.layers[layer_idx-1].parent_layer = self.layers[layer_idx]
+      end
     end
     
-    self:updateValues(data)
+    self:buildTree(data)
   end,
+  
+  -------------------------------------------------------------------------------------------------
   
   renderLabels = function(self, MaxLabels, viewport)
     local zoom = GetCamera("WorldCamera"):GetZoom()
@@ -501,56 +780,121 @@ BubblePlot = Class() {
     WARN("BubblePlot:renderLabels(): Did not find a layer which corresponds to zoom level of " .. tostring(zoom))
   end,
   
+  -------------------------------------------------------------------------------------------------
+  --[[
+  addNewValue = function(self, datapoint)
+    local bubble = BubblePoint(datapoint.position, self.color, datapoint[self.raw_data_field])
+    table.insert(self.layers[0].bubble_points, bubble)
+    --datapoint.bubble_ref = bubble
+    
+    self.layers[1]:reclusterPointRecursively( self.layers[1]:clusterNewPointIntoLayer(bubble) )
+    
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
+  removeValue = function(self, datapoint)
+    helpers.ASSERT(datapoint.bubble_ref)
+    
+    local bubble = datapoint.bubble_ref
+    local bubble_idx = table.find(self.layers[0].bubble_points, bubble)
+    
+    -- remove from layer 0
+    self.layers[0].bubble_points[bubble_idx] = nil
+    
+    -- remove from tree
+    
+    local parent = bubble.parent
+    helpers.ASSERT(parent)
+    parent:RemoveChild(bubble)
+    parent:UpdateTotalValue()
+    self.layers[1]:reclusterPointRecursively(parent)
+    
+  end,
+  --]]
+  
+  -------------------------------------------------------------------------------------------------
+  
+  addNewValue = function(self, datapoint)
+    local bubble = BubblePoint(datapoint.position, self.color, datapoint[self.raw_data_field])
+    
+    LOG(">>>>>>>>>>>> BubblePlot: adding new value = " .. tostring(bubble.self_value))
+    
+    -- insert into basic layer
+    table.insert(self.layers[0].bubble_points, bubble)
+    
+    -- recursively update parents
+    self.layers[1]:clusterChildIntoLayer(bubble, true)
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
   updateValues = function(self, data)
     if table.empty(data) then
       WARN('got empty dataset for BubblePlot::updateValues(), not updating')
       return
     end
     
-    --[[
     LOG("updating bubble plot with " .. tostring(table.getsize(data)) .. " datapoints")
-    local data_changed = self.raw_data == nil
-    if not data_changed then
-      for id, d in data do
-        local orig = self.raw_data[id]
-        if orig == nil or d[self.raw_data_field] ~= orig[self.raw_data_field] then
-          data_changed = true
-          break
-        end
+    for id, d in data do
+      local orig = self.raw_data[id]
+      if orig == nil then
+        LOG("no previous data for " .. tostring(d) .. " -> adding new value = " .. tostring(d[self.raw_data_field]))
+        self.raw_data[id] = d
+        self:addNewValue(d)
+      elseif d == nil or d[self.raw_data_field] == 0 or IsDestroyed(d) then
+        --self:removeValue(orig)
+        --self.raw_data[id] = nil
+      elseif d[self.raw_data_field] ~= orig[self.raw_data_field] then
+        -- TODO: handle changes
+        WARN("BubblePlot: Cannot handle changes yet!")
       end
     end
-    
-    if not data_changed then
-      helpers.ASSERT(table.getsize(data) == table.getsize(self.raw_data))
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
+  buildTree = function(self, data)
+    if table.empty(data) then
+      WARN('got empty dataset for BubblePlot::updateValues(), not updating')
+      return
     end
     
-    if data_changed then
-    --]]
-      LOG("got new data! rebuilding tree...")
-      self.raw_data = table.copy(data)
-      
-      -- buil first layer directly from raw data
-      
-      -- clear first layer
-      self.layers[0].bubble_points = {}
-      
-      -- insert points from data
-      for _, d in self.raw_data do
-        table.insert(self.layers[0].bubble_points, BubblePoint(d.position, self.color, d[self.raw_data_field])) --pt, col, val
+    LOG("got new data! rebuilding tree...")
+    self.raw_data = table.copy(data)
+    
+    helpers.ASSERT_UNIQUE_SET(self.raw_data)
+    
+    -- buil first layer directly from raw data
+    
+    -- clear first layer
+    self.layers[0].bubble_points = {}
+    
+    -- insert points from data
+    for _, d in self.raw_data do
+      local bubble = BubblePoint(d.position, self.color, d[self.raw_data_field])
+      table.insert(self.layers[0].bubble_points, bubble)
+      d.bubble_ref = bubble
+    end
+    
+    LOG("layer 0: is unique?")
+    helpers.ASSERT_UNIQUE_SET(self.layers[0].bubble_points)
+    helpers.ASSERT_UNIQUE_SET(self.layers[0].bubble_points)
+    
+    -- cluster up from first layer
+    for i, l in self.layers do
+      if i == 0 then
+        continue
       end
-      
-      -- cluster up from first layer
-      for i, l in self.layers do
-        if i == 0 then
-          continue
-        end
-        
-        l:clusterPoints(self.layers[i-1].bubble_points) -- cluster up from prev. layer
-      end
-    --end
+    
+      LOG("clustering layer " .. tostring(i))
+      l:clusterPoints(self.layers[i-1].bubble_points) -- cluster up from prev. layer
+    end
   end,
 }
 
+---------------------------------------------------------------------------------------------------
+---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
 
 -- OLD CODE:
