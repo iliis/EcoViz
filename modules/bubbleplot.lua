@@ -633,6 +633,86 @@ BubbleLayer = Class() {
         self:mergeRecursively(cluster)
       end
     end
+    
+    return cluster
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  -- destroy all points in bubbles and re-add them to current layer
+  -- recursively to this to their parents too
+  
+  reclusterPoints = function(self, bubbles)
+    
+    LOG("reclustering " .. tostring(table.getsize(bubbles)) .. " points:")
+    
+    local affected_parents = {}
+    for _, b in bubbles do
+      
+      LOG("     - " .. tostring(b) .. " = " .. tostring(b:value()))
+    
+      local idx = table.find(self.bubble_points, b)
+      helpers.ASSERT(idx)
+      
+      -- remove from current layer
+      self.bubble_points[idx] = nil
+      
+      -- remove from parents
+      if b.parent then
+        local parent = b.parent
+        affected_parents[parent] = true
+        parent:RemoveChild(b)
+      end
+      
+      -- re-add children
+      for _, c in b.children do
+        local node = self:clusterChildIntoLayer(c, false)
+        
+        -- node can either be a new cluster (node.parent == nil), in which case we have to add it to parent layer first
+        -- or it is an existing cluster, in which case we have to recluster its parent
+        if node.parent then
+          affected_parents[node.parent] = true
+        else
+          if self.parent_layer then
+            affected_parents[self.parent_layer:clusterChildIntoLayer(node, true)] = true
+            -- recursion should make parent of node valid
+          end
+        end
+      end
+    end
+    
+    -- convert key-list to normal value-list
+    local affected_parents_list = {}
+    for k, _ in affected_parents do
+      table.insert(affected_parents_list, k)
+    end
+    
+    -- no affected parents IFF no parent layer
+    helpers.ASSERT(table.empty(affected_parents_list) == (self.parent_layer == nil))
+    
+    -- recluster their parents
+    if self.parent_layer then
+      self.parent_layer:reclusterPoints(affected_parents_list)
+    end
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  -- remove point and recluster parents
+  
+  removePoint = function(self, bubble)
+    LOG("removing " .. tostring(bubble) .. " = " .. tostring(bubble:value()) .. " from layer")
+    
+    local idx = table.find(self.bubble_points, bubble)
+    helpers.ASSERT(idx)
+    
+    -- remove from current layer
+    self.bubble_points[idx] = nil
+    
+    -- remove from parents
+    if bubble.parent then
+      local parent = bubble.parent
+      parent:RemoveChild(bubble)
+      self.parent_layer:reclusterPoints({parent})
+    end
   end,
   
   -------------------------------------------------------------------------------------------------
@@ -743,6 +823,8 @@ BubblePlot = Class() {
     
     self.raw_data = nil
     self.raw_data_field = data_field
+    self.raw_data_to_bubble0 = {} -- keep a mapping from 'data' entries to bubbles in layer 0
+    -- this assumes data entries are kept static! (i.e. don't change address/id)
     
     self.color = color
     
@@ -813,12 +895,26 @@ BubblePlot = Class() {
   end,
   --]]
   
+  removeValue = function(self, datapoint)
+    
+    local bubble = self.raw_data_to_bubble0[datapoint]
+    
+    helpers.ASSERT(bubble)
+    helpers.ASSERT(table.find(self.layers[0].bubble_points, bubble))
+    
+    LOG("<<<<<<<<<<< BubblePlot: removing value " .. tostring(bubble) .. " = " .. tostring(bubble:value()))
+    
+    self.layers[0]:removePoint(bubble)
+    self.raw_data_to_bubble0[datapoint] = nil
+  end,
+  
   -------------------------------------------------------------------------------------------------
   
   addNewValue = function(self, datapoint)
     local bubble = BubblePoint(datapoint.position, self.color, datapoint[self.raw_data_field])
+    self.raw_data_to_bubble0[datapoint] = bubble
     
-    LOG(">>>>>>>>>>>> BubblePlot: adding new value = " .. tostring(bubble.self_value))
+    LOG(">>>>>>>>>>>> BubblePlot: adding new value " .. tostring(bubble) .. " = " .. tostring(bubble.self_value))
     
     -- insert into basic layer
     table.insert(self.layers[0].bubble_points, bubble)
@@ -835,19 +931,43 @@ BubblePlot = Class() {
       return
     end
     
-    LOG("updating bubble plot with " .. tostring(table.getsize(data)) .. " datapoints")
+    -- mark datapoints that are still in 'data' and remove everything that isn't anymore
+    local raw_data_still_exists = {}
+    for id, d in self.raw_data do
+      raw_data_still_exists[id] = false
+    end
+    
+    LOG("############### BubblePlot: updating bubble plot with " .. tostring(table.getsize(data)) .. " datapoints")
+    
     for id, d in data do
+      raw_data_still_exists[id] = true
       local orig = self.raw_data[id]
       if orig == nil then
-        LOG("no previous data for " .. tostring(d) .. " -> adding new value = " .. tostring(d[self.raw_data_field]))
+        LOG("no previous data for " .. tostring(id) .. " = " .. tostring(d) .. " -> adding new value = " .. tostring(d[self.raw_data_field]))
         self.raw_data[id] = d
         self:addNewValue(d)
-      elseif d == nil or d[self.raw_data_field] == 0 or IsDestroyed(d) then
-        --self:removeValue(orig)
-        --self.raw_data[id] = nil
+      elseif d == nil or d[self.raw_data_field] == 0 then
+        local val = nil
+        if d then
+          val = d[self.raw_data_field]
+        end
+        LOG("--------- datapoint " .. tostring(id) .. " seems to have gone: " .. tostring(d) .. " val[" .. tostring(self.raw_data_field) .. "] = " .. tostring(val))
+        self:removeValue(orig)
+        self.raw_data[id] = nil
       elseif d[self.raw_data_field] ~= orig[self.raw_data_field] then
-        -- TODO: handle changes
+        -- TODO: handle changes. Probably not necessary tough, as FAF doesn't send updates to existing points (just add/removes) for reclaim
         WARN("BubblePlot: Cannot handle changes yet!")
+      end
+    end
+    
+    for id, exists in raw_data_still_exists do
+      if not exists then
+        local orig = self.raw_data[id]
+        LOG("--------- datapoint " .. tostring(id) .. " seems to have gone (no entry in data): " .. tostring(orig) .. " val[" .. tostring(self.raw_data_field) .. "] = " .. tostring(orig[self.raw_data_field]))
+        self:removeValue(orig)
+        self.raw_data[id] = nil
+      else
+        LOG("--------- datapoint " .. tostring(id) .. " still exists")
       end
     end
   end,
@@ -871,10 +991,11 @@ BubblePlot = Class() {
     self.layers[0].bubble_points = {}
     
     -- insert points from data
-    for _, d in self.raw_data do
+    for id, d in self.raw_data do
+      LOG("buildTree: adding id " .. tostring(id))
       local bubble = BubblePoint(d.position, self.color, d[self.raw_data_field])
       table.insert(self.layers[0].bubble_points, bubble)
-      d.bubble_ref = bubble
+      self.raw_data_to_bubble0[d] = bubble
     end
     
     LOG("layer 0: is unique?")
