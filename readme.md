@@ -1,3 +1,18 @@
+Eco Visualizer
+==============
+
+
+known limitations
+-----------------
+
+* bubble culling using midpoint
+* initial setup slow (depending on map)
+* only update tree when showing (pro: no slowdown at all when not used, con: might take a moment to update after many changes)
+
+* not *everything* reclaimable is shown, the game simply doesn't provide this info to UI
+* no updates for partially reclaimed stuff: still same amount shown -> game doesn't provide this info either
+
+
 Eco Predict
 ===========
 

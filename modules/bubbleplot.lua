@@ -82,21 +82,6 @@ Widgets hierarchy:
       ...
 
 ]]--
----------------------------------------------------------------------------------------------------
--- represents a single value with position in the world (such as a single reclaim object or a single pgen)
---[[
-ValueObject = Class() {
-	__init = function(self, id, world_position, value)
-		self.id = id
-		self.world_position = world_position
-		self.value = value
-	end,
-
-	DistanceTo = function(self, other)
-		return VDist3(self.world_position, other.world_position)
-	end,
-}
---]]
 
 ---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
@@ -268,9 +253,10 @@ BubblePoint = Class() {
   
   -------------------------------------------------------------------------------------------------
   
-  SetValue = function(self, value)
-    if value ~= self.self_value then
+  SetValue = function(self, value, pos)
+    if value ~= self.self_value or pos ~= self.world_pos then
       self.self_value = value
+      self.world_pos = pos
       self:UpdateTotalValue()
     end
   end,
@@ -421,112 +407,6 @@ BubbleLayer = Class() {
       return nil
     end
   end,
-  
-  -------------------------------------------------------------------------------------------------
-  -- search for a point from layer below in this layer
-  --[[
-  find_child = function(self, bubble)
-    helpers.ASSERT(bubble)
-    for c_idx, c in self.bubble_points do
-      if table.find(c.children, bubble) then
-        return c_idx
-      end
-    end
-    return nil
-  end,
-  
-  -------------------------------------------------------------------------------------------------
-  
-  reclusterPointRecursively = function(self, node_current)
-    LOG("reclustering " .. tostring(node_current) .. " with value " .. tostring(node_current:value()))
-    
-    -- remove current node from tree
-    
-  end,
-  
-  
-  -- TODO: document this!
-  reclusterPointRecursively_orig = function(self, node_child)
-    
-    LOG("reclustering " .. tostring(node_child) .. " with value " .. tostring(node_child:value()))
-    
-    -- check if new bubble (child) is already part of this layer
-    local local_idx = self:find_child(node_child)
-    if local_idx then
-      
-      -- recluster bubble by splitting it into components
-      -- TODO: this assumes bubble is a *cluster* (i.e. has self_value = 0)
-      
-      local node_current = self.bubble_points[local_idx]
-      
-      LOG(" --> splitting up existing cluster into " .. tostring(table.getsize(node_current.children)) .. " points")
-      
-      
-      local node_parent = node_current.parent
-     
-      -- remove curent node from this layer
-      self.bubble_points[local_idx] = nil
-      
-      -- check if we can remove it entirely
-      node_current:UpdateTotalValue()
-      
-      if node_current:value() == 0 then
-        LOG(" --> removing cluster as it only contains single bubble which was removed")
-        
-        if node_parent then
-          helpers.ASSERT(self.parent_layer)
-          self.parent_layer:reclusterPointRecursively(node_current)
-        end
-        
-        return
-      end
-      
-      -- remove old cluster from tree
-      if node_parent then
-        node_parent:RemoveChild(node_current)
-        node_parent:UpdateTotalValue() -- required if no children get clustered to node_parent
-      else
-        helpers.ASSERT(not self.parent_layer)
-      end
-      
-      -- now add children again
-      local new_clusters = {}
-      for _, c in node_current.children do
-        if c:value() ~= 0 then
-          helpers.ASSERT_VECT_NONZERO(c.weighted_pos)
-          LOG("    --> reinserting child with value " .. tostring(c:value()))
-          
-          table.insert(new_clusters, self:clusterNewPointIntoLayer(c))
-        end
-      end
-      
-      if self.parent_layer then
-        LOG("recusrively recluster those again in parent")
-        for _, new_cluster in new_clusters do
-          self.parent_layer:reclusterPointRecursively(new_cluster)
-        end
-        
-        if not table.find(new_clusters, node_parent) then
-          self.parent_layer:reclusterPointRecursively(node_parent)
-        end
-      end
-    else
-      
-      if node_child:value() == 0 then
-        LOG(" --> not adding, value is zero")
-      else
-        
-        -- add bubble to existing/new cluster in this layer
-        LOG(" --> adding as new point")
-        node_child = self:clusterNewPointIntoLayer(node_child)
-        if self.parent_layer then
-          LOG("recusrively adding new cluster")
-          self.parent_layer:reclusterPointRecursively(chnode_childild)
-        end
-      end
-    end
-  end,
-  --]]
   
   -------------------------------------------------------------------------------------------------
   -- merge two bubble points into one (B into A)
@@ -873,64 +753,61 @@ BubblePlot = Class() {
   end,
   
   -------------------------------------------------------------------------------------------------
-  --[[
-  addNewValue = function(self, datapoint)
-    local bubble = BubblePoint(datapoint.position, self.color, datapoint[self.raw_data_field])
-    table.insert(self.layers[0].bubble_points, bubble)
-    --datapoint.bubble_ref = bubble
-    
-    self.layers[1]:reclusterPointRecursively( self.layers[1]:clusterNewPointIntoLayer(bubble) )
-    
-  end,
   
-  -------------------------------------------------------------------------------------------------
-  
-  removeValue = function(self, datapoint)
-    helpers.ASSERT(datapoint.bubble_ref)
+  removeValue = function(self, id, datapoint)
     
-    local bubble = datapoint.bubble_ref
-    local bubble_idx = table.find(self.layers[0].bubble_points, bubble)
+    local bubble = self.raw_data_to_bubble0[id]
     
-    -- remove from layer 0
-    self.layers[0].bubble_points[bubble_idx] = nil
+    if not bubble or not bubble.value then
+      LOG("removeValue ERROR: bubble is nil!")
+      helpers.LOG_OBJ(bubble, true)
+    end
     
-    -- remove from tree
-    
-    local parent = bubble.parent
-    helpers.ASSERT(parent)
-    parent:RemoveChild(bubble)
-    parent:UpdateTotalValue()
-    self.layers[1]:reclusterPointRecursively(parent)
-    
-  end,
-  --]]
-  
-  removeValue = function(self, datapoint)
-    
-    local bubble = self.raw_data_to_bubble0[datapoint]
+    LOG("<<<<<<<<<<< BubblePlot: removing value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = " .. tostring(bubble:value()))
     
     helpers.ASSERT(bubble)
     helpers.ASSERT(table.find(self.layers[0].bubble_points, bubble))
     
-    LOG("<<<<<<<<<<< BubblePlot: removing value " .. tostring(bubble) .. " = " .. tostring(bubble:value()))
-    
     self.layers[0]:removePoint(bubble)
-    self.raw_data_to_bubble0[datapoint] = nil
+    self.raw_data_to_bubble0[id] = nil
+    self.raw_data[id] = nil
   end,
   
   -------------------------------------------------------------------------------------------------
   
-  addNewValue = function(self, datapoint)
+  addNewValue = function(self, id, datapoint)
     local bubble = BubblePoint(datapoint.position, self.color, datapoint[self.raw_data_field])
-    self.raw_data_to_bubble0[datapoint] = bubble
+    self.raw_data[id] = datapoint
+    self.raw_data_to_bubble0[id] = bubble
     
-    LOG(">>>>>>>>>>>> BubblePlot: adding new value " .. tostring(bubble) .. " = " .. tostring(bubble.self_value))
+    LOG(">>>>>>>>>>>> BubblePlot: adding new value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = " .. tostring(bubble.self_value))
     
     -- insert into basic layer
     table.insert(self.layers[0].bubble_points, bubble)
     
     -- recursively update parents
     self.layers[1]:clusterChildIntoLayer(bubble, true)
+  end,
+  
+  -------------------------------------------------------------------------------------------------
+  
+  UpdateValue = function(self, id, old_datapoint, new_datapoint)
+    local bubble = self.raw_data_to_bubble0[id]
+    
+    LOG(">>>>>>>>>>>> BubblePlot: updating existing value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = from " .. tostring(bubble.self_value) .. " to " .. tostring(new_datapoint[self.raw_data_field]))
+    
+    helpers.ASSERT(bubble)
+    helpers.ASSERT(table.find(self.layers[0].bubble_points, bubble))
+    helpers.ASSERT(bubble.self_value == old_datapoint[self.raw_data_field])
+    
+    bubble:SetValue(new_datapoint[self.raw_data_field], new_datapoint.position)
+    
+    if self.layers[1] then
+      helpers.ASSERT(bubble.parent)
+      self.layers[1]:reclusterPoints({bubble.parent})
+    end
+    
+    self.raw_data[id] = new_datapoint
   end,
   
   -------------------------------------------------------------------------------------------------
@@ -954,19 +831,19 @@ BubblePlot = Class() {
       local orig = self.raw_data[id]
       if orig == nil then
         LOG("no previous data for " .. tostring(id) .. " = " .. tostring(d) .. " -> adding new value = " .. tostring(d[self.raw_data_field]))
-        self.raw_data[id] = d
-        self:addNewValue(d)
+        self:addNewValue(id, d)
       elseif d == nil or d[self.raw_data_field] == 0 then
         local val = nil
         if d then
           val = d[self.raw_data_field]
         end
         LOG("--------- datapoint " .. tostring(id) .. " seems to have gone: " .. tostring(d) .. " val[" .. tostring(self.raw_data_field) .. "] = " .. tostring(val))
-        self:removeValue(orig)
-        self.raw_data[id] = nil
+        self:removeValue(id, orig)
       elseif d[self.raw_data_field] ~= orig[self.raw_data_field] then
-        -- TODO: handle changes. Probably not necessary tough, as FAF doesn't send updates to existing points (just add/removes) for reclaim
-        WARN("BubblePlot: Cannot handle changes yet!")
+        LOG("--------- datapoint " .. tostring(id) .. " = " .. tostring(orig) .. " seems to have changed:")
+        LOG("old value: " .. tostring(orig[self.raw_data_field]) .. " at loc = " .. helpers.vectostr(orig.position))
+        LOG("new value: " .. tostring(d[self.raw_data_field])    .. " at loc = " .. helpers.vectostr(d.position))
+        self:UpdateValue(id, orig, d)
       end
     end
     
@@ -974,10 +851,11 @@ BubblePlot = Class() {
       if not exists then
         local orig = self.raw_data[id]
         LOG("--------- datapoint " .. tostring(id) .. " seems to have gone (no entry in data): " .. tostring(orig) .. " val[" .. tostring(self.raw_data_field) .. "] = " .. tostring(orig[self.raw_data_field]))
-        self:removeValue(orig)
-        self.raw_data[id] = nil
+        self:removeValue(id, orig)
       else
         LOG("--------- datapoint " .. tostring(id) .. " still exists")
+        helpers.ASSERT(self.raw_data[id])
+        helpers.ASSERT(self.raw_data_to_bubble0[id])
       end
     end
   end,
@@ -1005,11 +883,10 @@ BubblePlot = Class() {
       LOG("buildTree: adding id " .. tostring(id))
       local bubble = BubblePoint(d.position, self.color, d[self.raw_data_field])
       table.insert(self.layers[0].bubble_points, bubble)
-      self.raw_data_to_bubble0[d] = bubble
+      self.raw_data_to_bubble0[id] = bubble
     end
     
     LOG("layer 0: is unique?")
-    helpers.ASSERT_UNIQUE_SET(self.layers[0].bubble_points)
     helpers.ASSERT_UNIQUE_SET(self.layers[0].bubble_points)
     
     -- cluster up from first layer
@@ -1026,105 +903,4 @@ BubblePlot = Class() {
 
 ---------------------------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------------------------
----------------------------------------------------------------------------------------------------
-
--- OLD CODE:
---[[
----------------------------------------------------------------------------------------------------
----------------------------------------------------------------------------------------------------
-
-function BuildTree(self, values)
-	while table.length(values) > 1 do
-		-- find closest pair
-		local obj_A = nil
-		local obj_B = nil
-		local best_dist = nil
-
-		for _, v in values do
-			if obj_A == nil then
-				obj_A = v
-			else
-				if (v == obj_A) then
-					WARN("Error: found item twice in 'values' of BuildTree()")
-				end
-
-				local dist = obj_A:DistanceTo(v)
-				if best_dist == nil or best_dist > dist then
-					best_dist = dist
-					obj_B = v
-				end
-			end
-		end
-
-		-- remove pair and put them into new group
-		values[obj_A] = nil
-		values[obj_B] = nil
-
-		local new_group = ValueObjectGroup({obj_A, obj_B}, best_dist)
-		values[new_group] = new_group
-	end
-		
-	-- set root to first=last item in 'values'
-	for _, v in values do
-		return v
-	end
-end
-
----------------------------------------------------------------------------------------------------
-
-
-
----------------------------------------------------------------------------------------------------
-
-ValueObjectGroup = Class() {
-	__init = function(self, _children, max_dist)
-		self.world_position = nil
-		self.value = nil
-
-		self.max_dist = max_dist
-
-		self.parent = nil -- TODO: not required?
-		self.children = {}
-
-		for c in _children do
-			self:AddChild(c)
-		end
-		self:updateWeightedPosition()
-	end,
-
-	DistanceTo = function(self, other)
-		return VDist3(self.world_position, other.world_position)
-	end,
-
-	updateWeightedPosition = function(self)
-		self.world_position = Vector(0,0,0)
-		self.value = 0
-
-		for child in self.children:
-			self.world_position = VAdd(self.world_position, VMult(child.world_position, child.value))
-			self.value = self.value + child.value
-		end
-
-		self.world_position = VMult(self.world_position, 1/self.value)
-	end,
-
-	AddChild = function(self, child)
-		if not self.children[child] then -- don't add it twice
-			self.children[child] = child
-			child.parent = self
-		end
-	end,
-
-	RemoveChild = function(self, child)
-		if self.children[child] then
-			self.children[child] = nil
-			child.parent = nil
-		end
-	end
-}
---]]
----------------------------------------------------------------------------------------------------
-
-
-
 ---------------------------------------------------------------------------------------------------
