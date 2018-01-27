@@ -41,3 +41,9 @@ Further Ideas
   Issues:
     * Knapsack-Algorithm for filling big rectangle with multiple small ones? Should be fast, but can be inaccurate
     * How to render this efficiently? Drawing lines as separate GUI elements is probably too much. Rendering a texture would be nice but looses pixel-accuracy when zooming.
+    
+* Visualize other things, like mass/energy production/consumption or the DPS of your units.
+
+* Options to change:
+  * color/transparency of bubbles
+  * clustering parameters
