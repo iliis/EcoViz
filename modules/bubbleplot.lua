@@ -533,6 +533,8 @@ BubbleLayer = Class() {
   -- doesn't change rest of tree (apart from parent/children)
   
   mergeNodes = function(self, A, B)
+    helpers.ASSERT(A ~= B)
+    
     if A.parent ~= B.parent then
       -- nodes in the same layer always have both or neither a parent
       helpers.ASSERT(A.parent)
@@ -594,7 +596,7 @@ BubbleLayer = Class() {
     
     helpers.ASSERT_VECT_NONZERO(point.weighted_pos)
     
-    --LOG("clustering new point with value = " .. tostring(point:value()))
+    LOG("clustering new point " .. tostring(point) .. " with value = " .. tostring(point:value()) .. " recursive? " .. tostring(recursive))
     
     local cluster = self:find_closest(point)
     
@@ -648,7 +650,7 @@ BubbleLayer = Class() {
     local affected_parents = {}
     for _, b in bubbles do
       
-      LOG("     - " .. tostring(b) .. " = " .. tostring(b:value()))
+      LOG("     > recluster " .. tostring(b) .. " = " .. tostring(b:value()))
     
       local idx = table.find(self.bubble_points, b)
       helpers.ASSERT(idx)
@@ -659,6 +661,7 @@ BubbleLayer = Class() {
       -- remove from parents
       if b.parent then
         local parent = b.parent
+        LOG("       affected parent from removing parent:" .. tostring(parent))
         affected_parents[parent] = true
         parent:RemoveChild(b)
       end
@@ -670,10 +673,17 @@ BubbleLayer = Class() {
         -- node can either be a new cluster (node.parent == nil), in which case we have to add it to parent layer first
         -- or it is an existing cluster, in which case we have to recluster its parent
         if node.parent then
+          LOG("       affected parent from clusterChild into current layer:" .. tostring(node.parent))
           affected_parents[node.parent] = true
         else
           if self.parent_layer then
-            affected_parents[self.parent_layer:clusterChildIntoLayer(node, true)] = true
+            -- don't add it recursively, as we might merge (and therefore delete) on of the affected_parents
+            -- inserting it into parent layer even as a new cluster (without parent) is okay tough, as reclusterPoints()
+            -- would remove the parent again anyway
+            local n = self.parent_layer:clusterChildIntoLayer(node, false)
+            helpers.ASSERT(n == node.parent)
+            affected_parents[n] = true
+            LOG("       affected parent from clusterChild into parent layer:" .. tostring(n))
             -- recursion should make parent of node valid
           end
         end
