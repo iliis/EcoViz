@@ -436,10 +436,10 @@ BubbleLayer = Class() {
       A:AddChild(c)
     end
     
-    LOG("merging B (" .. tostring(B) .. " = " .. tostring(B:value()) .. ") into A (" .. tostring(A) .. " = " .. tostring(A:value()) .. ") -> ")
+    --LOG("merging B (" .. tostring(B) .. " = " .. tostring(B:value()) .. ") into A (" .. tostring(A) .. " = " .. tostring(A:value()) .. ") -> ")
     
     A:UpdateTotalValue()
-    LOG("    -> A = " .. tostring(B:value()))
+    --LOG("    -> A = " .. tostring(B:value()))
     
     return A
   end,
@@ -476,7 +476,7 @@ BubbleLayer = Class() {
     
     helpers.ASSERT_VECT_NONZERO(point.weighted_pos)
     
-    LOG("clustering new point " .. tostring(point) .. " with value = " .. tostring(point:value()) .. " recursive? " .. tostring(recursive))
+    --LOG("clustering new point " .. tostring(point) .. " with value = " .. tostring(point:value()) .. " recursive? " .. tostring(recursive))
     
     local cluster = self:find_closest(point)
     
@@ -493,16 +493,16 @@ BubbleLayer = Class() {
       -- no existing cluster found where we could add this point, create new one
       cluster = BubblePoint(Vector(0,0,0), self.color, 0)
       table.insert(self.bubble_points, cluster)
-      LOG(" --> adding to new cluster " .. tostring(cluster))
-    else
-      LOG(" --> adding to existing cluster " .. tostring(cluster) .. " with value = " .. tostring(cluster:value()) .. " and " .. tostring(table.getsize(cluster.children)) .. " children")
+      --LOG(" --> adding to new cluster " .. tostring(cluster))
+    --else
+      --LOG(" --> adding to existing cluster " .. tostring(cluster) .. " with value = " .. tostring(cluster:value()) .. " and " .. tostring(table.getsize(cluster.children)) .. " children")
     end
     
     cluster:AddChild(point)
     cluster:UpdateTotalValue()
     helpers.ASSERT_VECT_NONZERO(cluster.weighted_pos)
     
-    LOG("     --> cluster now has value = " .. tostring(cluster:value()) .. " and " .. tostring(table.getsize(cluster.children)) .. " children")
+    --LOG("     --> cluster now has value = " .. tostring(cluster:value()) .. " and " .. tostring(table.getsize(cluster.children)) .. " children")
     
     if recursive then
       if new_cluster then
@@ -525,12 +525,12 @@ BubbleLayer = Class() {
   
   reclusterPoints = function(self, bubbles)
     
-    LOG("reclustering " .. tostring(table.getsize(bubbles)) .. " points:")
+    --LOG("reclustering " .. tostring(table.getsize(bubbles)) .. " points:")
     
     local affected_parents = {}
     for _, b in bubbles do
       
-      LOG("     > recluster " .. tostring(b) .. " = " .. tostring(b:value()))
+      --LOG("     > recluster " .. tostring(b) .. " = " .. tostring(b:value()))
     
       local idx = table.find(self.bubble_points, b)
       helpers.ASSERT(idx)
@@ -541,7 +541,7 @@ BubbleLayer = Class() {
       -- remove from parents
       if b.parent then
         local parent = b.parent
-        LOG("       affected parent from removing parent:" .. tostring(parent))
+        --LOG("       affected parent from removing parent:" .. tostring(parent))
         affected_parents[parent] = true
         parent:RemoveChild(b)
       end
@@ -553,7 +553,7 @@ BubbleLayer = Class() {
         -- node can either be a new cluster (node.parent == nil), in which case we have to add it to parent layer first
         -- or it is an existing cluster, in which case we have to recluster its parent
         if node.parent then
-          LOG("       affected parent from clusterChild into current layer:" .. tostring(node.parent))
+          --LOG("       affected parent from clusterChild into current layer:" .. tostring(node.parent))
           affected_parents[node.parent] = true
         else
           if self.parent_layer then
@@ -563,7 +563,7 @@ BubbleLayer = Class() {
             local n = self.parent_layer:clusterChildIntoLayer(node, false)
             helpers.ASSERT(n == node.parent)
             affected_parents[n] = true
-            LOG("       affected parent from clusterChild into parent layer:" .. tostring(n))
+            --LOG("       affected parent from clusterChild into parent layer:" .. tostring(n))
             -- recursion should make parent of node valid
           end
         end
@@ -589,7 +589,7 @@ BubbleLayer = Class() {
   -- remove point and recluster parents
   
   removePoint = function(self, bubble)
-    LOG("removing " .. tostring(bubble) .. " = " .. tostring(bubble:value()) .. " from layer")
+    --LOG("removing " .. tostring(bubble) .. " = " .. tostring(bubble:value()) .. " from layer")
     
     local idx = table.find(self.bubble_points, bubble)
     helpers.ASSERT(idx)
@@ -611,7 +611,7 @@ BubbleLayer = Class() {
   clusterPoints = function(self, data)
     helpers.ASSERT_UNIQUE_SET(data)
     
-    LOG("clustering layer with " .. tostring(table.getsize(data)) .. " datapoints and zoom = " .. tostring(self.zoom))
+    --LOG("clustering layer with " .. tostring(table.getsize(data)) .. " datapoints and zoom = " .. tostring(self.zoom))
     --local zoom_sq = zoom*zoom
     
     
@@ -632,7 +632,7 @@ BubbleLayer = Class() {
       self:clusterChildIntoLayer(pivot, false)
     end
     
-    LOG(" -> clustered into " .. tostring(table.getsize(self.bubble_points)) .. " clusters")
+    --LOG(" -> clustered into " .. tostring(table.getsize(self.bubble_points)) .. " clusters")
     helpers.ASSERT_UNIQUE_SET(self.bubble_points)
   end,
   
@@ -759,11 +759,11 @@ BubblePlot = Class() {
     local bubble = self.raw_data_to_bubble0[id]
     
     if not bubble or not bubble.value then
-      LOG("removeValue ERROR: bubble is nil!")
+      --LOG("removeValue ERROR: bubble is nil!")
       helpers.LOG_OBJ(bubble, true)
     end
     
-    LOG("<<<<<<<<<<< BubblePlot: removing value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = " .. tostring(bubble:value()))
+    --LOG("<<<<<<<<<<< BubblePlot: removing value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = " .. tostring(bubble:value()))
     
     helpers.ASSERT(bubble)
     helpers.ASSERT(table.find(self.layers[0].bubble_points, bubble))
@@ -780,7 +780,7 @@ BubblePlot = Class() {
     self.raw_data[id] = datapoint
     self.raw_data_to_bubble0[id] = bubble
     
-    LOG(">>>>>>>>>>>> BubblePlot: adding new value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = " .. tostring(bubble.self_value))
+    --LOG(">>>>>>>>>>>> BubblePlot: adding new value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = " .. tostring(bubble.self_value))
     
     -- insert into basic layer
     table.insert(self.layers[0].bubble_points, bubble)
@@ -794,7 +794,7 @@ BubblePlot = Class() {
   UpdateValue = function(self, id, old_datapoint, new_datapoint)
     local bubble = self.raw_data_to_bubble0[id]
     
-    LOG(">>>>>>>>>>>> BubblePlot: updating existing value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = from " .. tostring(bubble.self_value) .. " to " .. tostring(new_datapoint[self.raw_data_field]))
+    --LOG(">>>>>>>>>>>> BubblePlot: updating existing value id = " .. tostring(id) .. " / " .. tostring(bubble) .. " = from " .. tostring(bubble.self_value) .. " to " .. tostring(new_datapoint[self.raw_data_field]))
     
     helpers.ASSERT(bubble)
     helpers.ASSERT(table.find(self.layers[0].bubble_points, bubble))
@@ -824,25 +824,25 @@ BubblePlot = Class() {
       raw_data_still_exists[id] = false
     end
     
-    LOG("############### BubblePlot: updating bubble plot with " .. tostring(table.getsize(data)) .. " datapoints")
+    --LOG("############### BubblePlot: updating bubble plot with " .. tostring(table.getsize(data)) .. " datapoints")
     
     for id, d in data do
       raw_data_still_exists[id] = true
       local orig = self.raw_data[id]
       if orig == nil then
-        LOG("no previous data for " .. tostring(id) .. " = " .. tostring(d) .. " -> adding new value = " .. tostring(d[self.raw_data_field]))
+        --LOG("no previous data for " .. tostring(id) .. " = " .. tostring(d) .. " -> adding new value = " .. tostring(d[self.raw_data_field]))
         self:addNewValue(id, d)
       elseif d == nil or d[self.raw_data_field] == 0 then
         local val = nil
         if d then
           val = d[self.raw_data_field]
         end
-        LOG("--------- datapoint " .. tostring(id) .. " seems to have gone: " .. tostring(d) .. " val[" .. tostring(self.raw_data_field) .. "] = " .. tostring(val))
+        --LOG("--------- datapoint " .. tostring(id) .. " seems to have gone: " .. tostring(d) .. " val[" .. tostring(self.raw_data_field) .. "] = " .. tostring(val))
         self:removeValue(id, orig)
       elseif d[self.raw_data_field] ~= orig[self.raw_data_field] then
-        LOG("--------- datapoint " .. tostring(id) .. " = " .. tostring(orig) .. " seems to have changed:")
-        LOG("old value: " .. tostring(orig[self.raw_data_field]) .. " at loc = " .. helpers.vectostr(orig.position))
-        LOG("new value: " .. tostring(d[self.raw_data_field])    .. " at loc = " .. helpers.vectostr(d.position))
+        --LOG("--------- datapoint " .. tostring(id) .. " = " .. tostring(orig) .. " seems to have changed:")
+        --LOG("old value: " .. tostring(orig[self.raw_data_field]) .. " at loc = " .. helpers.vectostr(orig.position))
+        --LOG("new value: " .. tostring(d[self.raw_data_field])    .. " at loc = " .. helpers.vectostr(d.position))
         self:UpdateValue(id, orig, d)
       end
     end
@@ -850,10 +850,10 @@ BubblePlot = Class() {
     for id, exists in raw_data_still_exists do
       if not exists then
         local orig = self.raw_data[id]
-        LOG("--------- datapoint " .. tostring(id) .. " seems to have gone (no entry in data): " .. tostring(orig) .. " val[" .. tostring(self.raw_data_field) .. "] = " .. tostring(orig[self.raw_data_field]))
+        --LOG("--------- datapoint " .. tostring(id) .. " seems to have gone (no entry in data): " .. tostring(orig) .. " val[" .. tostring(self.raw_data_field) .. "] = " .. tostring(orig[self.raw_data_field]))
         self:removeValue(id, orig)
       else
-        LOG("--------- datapoint " .. tostring(id) .. " still exists")
+        --LOG("--------- datapoint " .. tostring(id) .. " still exists")
         helpers.ASSERT(self.raw_data[id])
         helpers.ASSERT(self.raw_data_to_bubble0[id])
       end
@@ -868,10 +868,10 @@ BubblePlot = Class() {
       return
     end
     
-    LOG("got new data! rebuilding tree...")
+    --LOG("got new data! rebuilding tree...")
     self.raw_data = table.copy(data)
     
-    helpers.ASSERT_UNIQUE_SET(self.raw_data)
+    --helpers.ASSERT_UNIQUE_SET(self.raw_data)
     
     -- buil first layer directly from raw data
     
@@ -880,14 +880,14 @@ BubblePlot = Class() {
     
     -- insert points from data
     for id, d in self.raw_data do
-      LOG("buildTree: adding id " .. tostring(id))
+      --LOG("buildTree: adding id " .. tostring(id))
       local bubble = BubblePoint(d.position, self.color, d[self.raw_data_field])
       table.insert(self.layers[0].bubble_points, bubble)
       self.raw_data_to_bubble0[id] = bubble
     end
     
-    LOG("layer 0: is unique?")
-    helpers.ASSERT_UNIQUE_SET(self.layers[0].bubble_points)
+    --LOG("layer 0: is unique?")
+    --helpers.ASSERT_UNIQUE_SET(self.layers[0].bubble_points)
     
     -- cluster up from first layer
     for i, l in self.layers do
@@ -895,7 +895,7 @@ BubblePlot = Class() {
         continue
       end
     
-      LOG("clustering layer " .. tostring(i))
+      --LOG("clustering layer " .. tostring(i))
       l:clusterPoints(self.layers[i-1].bubble_points) -- cluster up from prev. layer
     end
   end,
