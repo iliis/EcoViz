@@ -1,54 +1,39 @@
 Eco Visualizer
 ==============
 
+A more visual way of showing reclaim.
 
-known limitations
+Installation
+------------
+
+1. Open your mod folder. You can directly open it in FAF under 'Options' -> 'Show Paths...' -> 'Show mods folder'. It is usally something like `C:\Users\YOUR_USER\Documents\My Games\Gas Powered Games\Supreme Commander Forged Alliance\Mods\`.
+
+2. Clone this repository there.
+
+    git clone https://github.com/iliis/EcoViz.git
+
+3. Enable the mod. You can do this in FAF in the 'Vaults' -> 'Mods' tab under 'Manage UI Mods'. You can also enable it from the in-game lobby under 'Options' -> 'Mods'.
+
+Usage
+-----
+
+This mod replaces the classical reclaim points that are shown when holding 'Ctrl' and 'Shift'.
+Note that the game can freeze for a moment when rendering large updates (such as showing the plot for the first time on a map with a lot of reclaim).
+
+
+Known Limitations
 -----------------
 
-* bubble culling using midpoint
-* initial setup slow (depending on map)
-* only update tree when showing (pro: no slowdown at all when not used, con: might take a moment to update after many changes)
+* Display culling is done using the middle of a bubble, which causes big bubbles to dissapear at the screen edges.
+* Initialization can be slow. On maps with a lot of reclaim (such as 'Wonder' or 'Desert Joust') it will take a few seconds to build up the internal datastructures.
+* Updates are only done when the user shows the reclaim map (i.e. holds 'Ctrl-Shift'). This has the advantage that the visualization does not affect runtime at all when it isn't shown, but the disadvantage that more work has to be done when showing the reclaim map (as all the changes when the map was hidden have to be applied).
+* Not everything that can be reclaimed is shown, as the game engine simply doesn't provide it.
+* Stuff that is already partially reclaimed will still be shown as having the full amount. This is again a limitation of the game engine which doesn't provide this information to the UI layer.
 
-* not *everything* reclaimable is shown, the game simply doesn't provide this info to UI
-* no updates for partially reclaimed stuff: still same amount shown -> game doesn't provide this info either
+Further Ideas
+-------------
 
-
-Eco Predict
-===========
-
-
-TODO
-----
-
-Prediction:
-* Stall slowdown
-	* How does energy stall affect mass generation?
-	* Energy usage of shields etc.?
-* Adjancency Bonus
-* Reclaim
-* Time til project finished
-	* paused upgrades (e.g. mexes)
-	* supporting build power
-* build queues
-	* repeat
-	* walk times between buildings, factory run-off delay
-* regen, repair
-* upgrades
-
-
-
-Heatmap:
-* implement hotkey instead of showing it all the time ;)
-* also show resource consumption and generation
-* maybe also estimates from enemies
-* find good way of updating heatmap without slowing down GUI too much
-* resize heatmap when window/viewport is resized
-* add options (keymapping, resolution, colorscheme/mapping)
-
-Cluster Heatmap:
-* optimize clustering (maybe create a few discrete LOD levels)
-* find proper formula for cluster threshold (based on zoom, weighted position and mass)
-* implement for resource consumption too
-
-Permanent Limitations:
-* Reclaim info is very limited. Smaller trees and rocks etc. are not accessible from UI side.
+* Show sub-points in bigger clusters to give an idea if the big bubble consists of a lot of small ones or if there are one or two big single items (like experimental wrecks)
+  Issues:
+    * Knapsack-Algorithm for filling big rectangle with multiple small ones? Should be fast, but can be inaccurate
+    * How to render this efficiently? Drawing lines as separate GUI elements is probably too much. Rendering a texture would be nice but looses pixel-accuracy when zooming.
