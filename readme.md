@@ -3,6 +3,10 @@ Eco Visualizer
 
 A more visual way of showing reclaim.
 
+![reclaim is shown as separate points when fully zoomed in](screenshots/comparison0.png)
+![close points are merged into less, bigger points when zooming out](screenshots/comparison1.png)
+![the area of the bubble is proportional to the amount of mass it represents](screenshots/comparison2.png)
+
 Installation
 ------------
 
@@ -10,7 +14,7 @@ Installation
 
 2. Clone this repository there.
 
-    git clone https://github.com/iliis/EcoViz.git
+    `git clone https://github.com/iliis/EcoViz.git`
 
 3. Enable the mod. You can do this in FAF in the 'Vaults' -> 'Mods' tab under 'Manage UI Mods'. You can also enable it from the in-game lobby under 'Options' -> 'Mods'.
 
