@@ -45,5 +45,15 @@ Further Ideas
 * Visualize other things, like mass/energy production/consumption or the DPS of your units.
 
 * Options to change:
-  * color/transparency of bubbles
+  * transparency of bubbles
   * clustering parameters
+	* max distance to merge
+	* max bubble size, i.e. don't create bigger bubbles than X
+  * show numbers on bubbles
+  
+  
+TODO
+====
+
+* Name in game lobby is 'Eco Iz' ?!
+* 'common mod tools' still required? if yes, add to this readme
